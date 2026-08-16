@@ -1,0 +1,1237 @@
+@@@@@@@@@@요약본
+=========================================
+AWS 네트워크 최종 암기본 (10분 컷)
+=========================================
+
+■ DNS(포트번호53)
+- 역할: 도메인 → IP 변환
+- 응용계층에 존재
+- AWS에서는 : Route53
+
+흐름: 도메인 → 브라우저에서 캐시 조회 -> 업으면 DNS서버에 ip요청 → IP 반환 → 서버 접속
+
+-----------------------------------------
+
+■ TCP(포트번호가 아닌 포트를 향하는 통로같은 존재)
+- 연결형, 신뢰성 O, 순서 보장, 재전송(if ack없으면)
+- 사용: HTTP / HTTPS / SSH / FTP / DB
+
+vs
+
+■ UDP(포트번호가 아닌 포트를 향하는 통로같은 존재)
+- 비연결형, 빠름, 신뢰성 X, 재전송 X
+- 사용: DNS / 게임 / 영상 / 음성
+
+-----------------------------------------
+
+■ HTTP(port:80)
+- 웹 통신, Request → Response구조, Stateless(때문에 Cookie, Session, Token, JWT로 기억)
+-메서드: get(조회), post(생성), put(전부수정), patch(일부수정), delete(삭제)
+
+vs
+
+■ HTTPS(port:433)
+- HTTP + TLS암호화를 적용
+- 보호하는 내용: 데이터 암호화 + 통신상대인증(서버와 사용자 둘다 신뢰가능하다는것을 TLS로 인증)
+- AWS용으로 AWS Certificate Manager등 사용
+
+-----------------------------------------
+■가정용 공유기
+router, switch, wireless, DHCP, NAT, Firewall
+
+=========================================
+AWS에서의 네트워크
+=========================================
+
+AWS 계정
+│
+├── VPC(LAN) ->가상 네트워크: EC2라는 기기(서버)를 연결해 vpc라는 LAN으로 하나의 네트워크를 형성하는 느낌
+│   │
+│   ├── Subnet
+│   │   ├── EC2(핸드폰,컴터,AI냉장고등) -> 이 안에 여러개의 EC2라는 가상머신(서버)
+│   │   ├── RDS -> private subet에 존재
+│   │   └── Load Balancer -> 들어오는 사용자들 트래픽 분산시켜 교통정리
+│   │
+│   ├── Route Table
+│   ├── Internet Gateway
+│   ├── NAT Gateway
+│   ├── Security Group
+│   └── NACL
+│
+├── S3 ->vpc안의 public도 private도 아닌 vpc밖의 아예 다른 개념
+├── IAM -> 권한 관리자(부여, 회수 및 관리)
+├── CloudWatch -> 모니터링 서비스: ex) EC2의 cpu사용량이 95%되면 이를 관리자에게 알림 -> 관리자가 이를 보고 관리
+└── Lambda -> 코드로 서버없이 작은 프로그램 자동 실행기
+
+
+■ Public IP
+- 인터넷에서 접근 가능한 중복되지 않는 IP
+- aws의 EC2에 IPv4(public/elastic ip)부여 가능하지만 이 Public IP만 있다고 접속되는 것은 아님
+->필요: Public IP + Internet Gateway + Route Table(라우팅) + Security Group(방화벽)등
+
+-----------------------------------------
+
+■ Private IP
+- VPC 내부 통신용(ex: 172.~, 192.168.~)
+- 인터넷 직접 접근 불가, 보안용으로 많이 사용, vpc안의 자원은 private ip로 통신
+- 사용: EC2 / RDS / ETL / 내부 API
+
+-----------------------------------------
+
+■ VPC
+- AWS의 내 가상 네트워크
+- VPC 안에는 CIDR에 의한 Private IP들이 있고 추가로  네트워크 구성 요소(Subnet, Route Table, Internet Gateway, NAT Gateway, Security Group, NACL)가 있음
+   + Public IP는 해당 리소스에 필요할 때 별도로 부여!!!!
+-vpc는 다른 aws이용자의 네트워크(vpc)와 논리적으로 격리
+-vpc자체가 자동으로 인터넷과 연결되지 않음-> internet gateway, route table, 방화벽등의 설정 필요
+
+-----------------------------------------
+
+■ CIDR
+- IP 주소 범위 표현
+
+(예시: 기본적으로 192.168.0.0으로 4자리)
+| CIDR  | 의미           | 포함 범위    |
+| ----- | ------------ | -------- |
+| `/0`  | 아무 것도 고정 안 함 | 모든 IP    |
+| `/8`  | 첫 번째 숫자 고정   | 10.x.x.x |
+| `/16` | 앞 두 자리 고정    | 10.0.x.x |
+| `/24` | 앞 세 자리 고정    | 10.0.1.x |
+| `/32` | 전부 고정        | IP 하나만   |
+-----------------------------------------
+
+-각 Subnet의 IP 범위가 서로 겹치면 안 됨 + VPC의 CIDR 안에서 Subnet CIDR을 나눈다
+
+
+■ Subnet(여기에 EC2, RDS, Load Balancer)
+-  VPC의 IP 주소 범위를 더 작은 범위로 나눈 작은 네트워크
+- AWS에서 하나의 subnet은 반드시 하나의 가용영역(AZ)에 속하며 + 각 subnet을 다른 AZ에 할수있다면(필수X) 고가용성에 좋음
+
+1. Public Subnet(예시: 10.0.1.0/24)
+- Route Table에 Internet Gateway 경로 존재
+- 사용 용도: 공개 웹, NAT gateway등
+
+2. Private Subnet(예시: 10.0.2.0/24)
+- Internet Gateway 직접 경로 없음, NAT gateway사용
+- 사용용도: 내부 App EC2(어플리케이션 서버) / RDS / ETL 배치 / 민감한 데이터
+
+★ Public / Private 구분은 Public IP가 아니라 Route Table+internet gateway존재 유무가 결정
+
+-----------------------------------------
+
+■ Route Table
+- 트래픽 이동 경로, 어느 목적지로 보낼지 결정
+Destination = 최종 목적지, Target = 다음 목적지(최종 목적지가 될수도 있음)
+
+예시
+destination  -> target
+10.0.0.0/16   →  local
+0.0.0.0/0      →  Internet Gateway
+
+-----------------------------------------
+
+■ Internet Gateway
+- VPC ↔ Internet 연결/통신을 가능케 하는 AWS 네트워크 구성요소
+- **public ip/subnet**를 인터넷과 연결
+- 필요한것들 :Internet gateway 연결 + Route Table + Public IP + Security Group
+
+-----------------------------------------
+
+■ NAT Gateway
+- Private subnet 서버의 인터넷 사용 지원(internet gateway 사용 X)
+- Public Subnet에 배치
+- 공유기의 NAT와 같은 원리
+- NAT으로는 외부에서 내부 절대 접근불가!!! only 내부에서 외부로(내부에서 외부로 먼저 요청)
+- 흐름: Private EC2 → Route Table → NAT Gateway → Internet Gateway → Internet → 응답
+
+-----------------------------------------
+
+■ Security Group
+- 개별 AWS 자원 단위의 상태저장(Stateful) 방화벽
+- 규칙: inbound/outbound rule -> 들어오는거허용/나가는거허용
+- 특징: Stateful(한번 허용하면 반대 방향 규칙이 없어도 허용) + Allow만 가능(허용안되면 못들어옴)
+
+-----------------------------------------
+
+■ NACL
+- Subnet 단위 상태비저장(Stateless) 방화벽
+- 규칙: inbound/outbound rule
+- 특징: Stateless(허용해도 반대 응답 트래픽도 별도로 지정) +Allow와 Deny 둘다가능
+
+-----------------------------------------
+->
+■ SG vs NACL 비교
+
+Security Group: 자원 단위+Stateful+Allow만 가능
+
+NACL: Subnet 단위+Stateless+Allow + Deny 가능
+
+=========================================
+전체 구조
+=========================================
+
+Internet → Internet Gateway → VPC → Route Table → Public / Private Subnet → EC2 / ALB / RDS
+
+-----------------------------------------
+
+외부 사용자의 웹 접속
+
+DNS → Internet → Internet Gateway → Route Table → NACL → Security Group → ALB 또는 EC2 → 응답
+
+-----------------------------------------
+
+Private 서버의 인터넷 사용
+
+Private EC2 → Route Table → NAT Gateway → Internet Gateway → Internet → 응답
+
+=========================================
+★ 이것만 외우면 된다
+=========================================
+
+VPC = AWS 전체 네트워크
+
+CIDR = IP 주소 범위
+
+Subnet = VPC를 나눈 네트워크
+
+Route Table = 길 안내
+
+Internet Gateway = 인터넷 출입문
+
+NAT Gateway = Private → Internet
+
+Security Group = 자원 단위 Stateful 방화벽
+
+NACL = Subnet 단위 Stateless 방화벽
+
+Public Subnet = IGW 경로 O
+
+Private Subnet = IGW 경로 X (NAT 통해서만 인터넷 사용)
+
+
+
+
+
+
+
+
+
+
+
+
+=========================================
+네트워크 상세내용들
+=========================================
+
+■ 학습 목표
+
+교육 전에는 복잡한 네트워크 설계나 명령어까지 외울 필요는 없다.
+
+다만 아래 개념에 대해
+
+1. 무엇인지
+2. 왜 필요한지
+3. 서로 어떻게 연결되는지
+4. 대표적인 사용 예시
+
+정도는 설명할 수 있어야 한다.
+
+=========================================
+[기존 네트워크 내용에서 보완할 부분]
+=========================================
+
+1. DNS (Domain Name System)
+
+■ 정의
+
+DNS는 사람이 읽기 쉬운 도메인 이름을 컴퓨터가 사용하는 IP 주소로 변환해주는 시스템이다.
+
+예시
+
+www.example.com -> 203.0.113.10
+
+사용자는 웹사이트에 접속할 때 IP 주소를 직접 입력하지 않고 도메인 이름을 입력한다.
+
+이때 DNS가 도메인에 대응되는 서버의 IP 주소를 찾아준다.
+
+■ 동작 흐름
+
+사용자가 브라우저에 www.example.com 입력
+-> 브라우저와 운영체제가 기존 DNS 캐시 확인
+-> 캐시에 없으면 DNS 서버에 IP 주소 질의
+-> DNS 서버가 해당 도메인의 IP 주소 반환
+-> 브라우저가 반환된 IP 주소의 서버에 접속
+-> HTTP 또는 HTTPS 통신 시작
+
+■ 계층
+
+DNS는 응용 계층(Application Layer) 프로토콜이다.
+
+■ 포트: IP 주소로 찾아온 컴퓨터 안에서, 특정 프로그램이나 서비스를 정확히 찾아가기 위한 논리적 방 번호
+ex) 80 (HTTP), 443 (HTTPS), DNS(53)
+
+일반적인 DNS 질의 -> UDP 53번
+큰 응답이나 영역 전송 등 -> TCP 53번도 사용 가능
+##이때 UDP, TCP는 포트 번호를 '담는 주머니(프로토콜)'!!!!(방으로 향하는 복도)
+
+■ AWS와의 연결
+
+AWS에서는 Amazon Route 53이 대표적인 DNS 서비스이다.
+
+Route 53을 이용하면
+
+example.com -> 로드 밸런서
+example.com -> EC2
+example.com -> CloudFront
+
+등으로 연결할 수 있다.
+
+■ 핵심 정리
+
+DNS는 실제 데이터를 전달하는 기술이라기보다, 통신할 서버의 주소를 먼저 찾도록 도와주는 시스템이다.
+
+-----------------------------------------
+
+2. TCP (Transmission Control Protocol)
+
+■ 정의
+
+TCP는 두 장치가 통신 전에 연결을 설정한 뒤 데이터를 안정적으로 전달하는 전송 계층 프로토콜이다.
+
+■ 계층
+
+OSI 4계층인 전송 계층(Transport Layer)에 속한다.
+
+■ 주요 특징
+
+- 연결 지향
+- 데이터 전달 신뢰성 보장
+- 데이터 순서 보장
+- 손실된 데이터 재전송
+- 오류 및 흐름 제어
+- UDP보다 상대적으로 느림
+
+■ 3-way Handshake
+
+TCP 통신을 시작하기 전에 연결을 확인하는 과정이다.
+
+클라이언트 -> 서버 : SYN(신호) (클라이언트: "여보세요? 제 목소리 들리시나요?") 
+서버 -> 클라이언트 : SYN + ACK(확인) (서버:  "응 잘 들려! 내 목소리도 잘 들려?")
+클라이언트 -> 서버 : ACK(최종확인) (클라이언트:  "응 잘 들려! 이제 말할게.")
+
+이 과정이 완료되면 실제 데이터를 주고받을 수 있다.
+
+■ 쉽게 이해하면
+
+SYN -> 통신 가능한가요?
+SYN + ACK -> 가능합니다. 당신도 가능한가요?
+ACK -> 가능합니다. 이제 통신하겠습니다.
+
+■ TCP가 신뢰성을 확보하는 방법
+
+데이터에 순서 번호를 부여
+-> 수신자가 데이터를 받으면 ACK 응답
+-> 일정 시간 동안 ACK가 없으면 재전송
+-> 순서가 바뀐 데이터는 올바른 순서로 재조립
+
+■ 사용 예시
+
+- HTTP / HTTPS
+- SSH
+- FTP
+- 이메일
+- 데이터베이스 연결
+- 파일 전송
+
+■ AWS와의 연결
+
+EC2의 Security Group에서 TCP 22번을 허용하면 SSH 접속이 가능하다.
+
+TCP 80번 -> HTTP
+TCP 443번 -> HTTPS
+TCP 3306번 -> MySQL
+TCP 5432번 -> PostgreSQL
+
+■ 핵심 정리
+
+TCP는 속도보다 정확성과 신뢰성이 중요한 통신에 사용된다.
+
+-----------------------------------------
+
+3. UDP (User Datagram Protocol)
+
+■ 정의
+
+UDP는 별도의 연결 설정 없이 데이터를 빠르게 전송하는 전송 계층 프로토콜이다.
+
+■ 계층
+
+OSI 4계층인 전송 계층에 속한다.
+
+■ 주요 특징
+
+- 비연결형
+- 연결 설정 과정이 없음
+- 전송 속도가 빠름
+- 데이터 도착을 보장하지 않음
+- 데이터 순서를 보장하지 않음
+- 손실된 데이터를 기본적으로 재전송하지 않음
+- TCP보다 구조가 단순함
+
+■ 사용 예시
+
+- 실시간 영상
+- 음성 통화
+- 온라인 게임
+- 실시간 스트리밍
+- DNS의 일반적인 질의
+
+■ 왜 실시간 서비스에서 사용하는가?
+
+영상통화에서 일부 데이터가 잠깐 손실되더라도 해당 데이터를 다시 기다리는 것보다 최신 데이터를 빠르게 받는 것이 더 중요하기 때문이다.
+
+■ 핵심 정리
+
+UDP는 정확성보다 속도와 실시간성이 중요한 통신에 사용된다.
+
+-----------------------------------------
+
+4. HTTP (HyperText Transfer Protocol)
+
+■ 정의
+
+HTTP는 클라이언트와 서버가 "웹" 데이터를 주고받기 위한 응용 계층 프로토콜이다.
+
+■ 계층
+
+응용 계층(Application Layer)에 속한다.
+
+■ 기본 포트
+
+HTTP -> 80번
+
+■ Request / Response 구조
+
+클라이언트가 서버에 요청(Request)
+-> 서버가 요청을 처리
+-> 서버가 클라이언트에 응답(Response)
+
+예시
+
+브라우저 -> GET /products 요청
+서버 -> 상품 목록과 상태 코드 200 응답
+
+■ 주요 HTTP 메서드
+
+GET -> 데이터 조회
+POST -> 데이터 생성
+PUT -> 데이터 전체 수정
+PATCH -> 데이터 일부 수정
+DELETE -> 데이터 삭제
+
+■ Stateless
+
+HTTP는 기본적으로 이전 요청의 상태를 기억하지 않는 무상태(Stateless) 프로토콜이다.
+
+예를 들어 서버는 별도의 기능이 없다면 같은 사용자가 이전에 로그인했는지 자동으로 기억하지 않는다.
+
+이 문제를 보완하기 위해 다음과 같은 기술을 사용한다.
+
+- Cookie
+- Session
+- Token
+- JWT
+
+■ 대표적인 상태 코드
+
+200 -> 요청 성공
+201 -> 데이터 생성 성공
+400 -> 잘못된 요청
+401 -> 인증 필요 또는 인증 실패
+403 -> 권한 없음
+404 -> 자원을 찾을 수 없음
+500 -> 서버 내부 오류
+503 -> 서버가 일시적으로 요청을 처리할 수 없음
+
+■ 핵심 정리
+
+HTTP는 클라이언트가 요청을 보내고 서버가 응답하는 웹 통신 규칙이며, 기본적으로 이전 상태를 기억하지 않는다.
+
+-----------------------------------------
+
+5. HTTPS (HTTP Secure)
+: 사이트와 사용자 둘다의 보안을 위한것이지만 궁극적으로는 '사용자 보안'을 지키기 위해 사이트가 도입하는 기술!!!!
+
+■ 정의
+
+HTTPS는 HTTP 통신에 TLS 암호화를 적용한 보안 통신 방식이다.
+
+■ 기본 포트
+
+HTTPS -> 443번
+
+■ 보호하는 내용
+
+- 데이터 암호화
+- 통신 상대 인증
+- 데이터 위변조 방지
+
+■ HTTP와 HTTPS 차이
+
+HTTP
+- 데이터가 암호화되지 않을 수 있음
+- 중간에서 내용을 확인당할 위험이 있음
+- 기본 포트 80
+
+HTTPS
+- TLS를 이용해 데이터를 암호화
+- 서버 인증서를 통해 접속 대상 확인
+- 기본 포트 443
+
+■ TLS 인증서
+
+HTTPS 서버는 인증서를 사용해 자신이 신뢰할 수 있는 서버임을 사용자에게 증명한다.
+
+브라우저는 인증서의 유효성을 확인한 뒤 암호화 통신을 시작한다.
+
+■ AWS와의 연결
+
+AWS에서는 다음과 같은 서비스로 HTTPS를 구성할 수 있다.
+
+AWS Certificate Manager -> TLS 인증서 발급 및 관리
+Application Load Balancer -> HTTPS 요청 수신
+CloudFront -> 사용자와 가까운 위치에서 HTTPS 콘텐츠 제공
+
+■ 핵심 정리
+
+HTTPS는 단순히 HTTP보다 빠른 프로토콜이 아니라, HTTP에 암호화와 인증 기능을 추가한 통신 방식이다.
+
+-----------------------------------------
+
+6. 가정용 공유기
+
+■ 정의
+
+가정용 공유기는 하나의 기능만 수행하는 장치가 아니라 여러 네트워크 기능을 결합한 장치이다.
+
+■ 주요 기능
+
+Router
+-> 집 내부 네트워크와 외부 인터넷 사이의 경로를 연결한다.
+
+Switch
+-> 같은 집 내부의 여러 유선 장치를 연결한다.
+
+Wireless Access Point
+-> 스마트폰과 노트북 등이 Wi-Fi로 접속할 수 있게 한다.
+
+DHCP
+-> 연결된 장치에 Private IP 주소를 자동으로 할당한다.
+
+NAT
+-> 여러 내부 장치가 하나의 Public IP를 함께 사용하도록 주소를 변환한다.
+
+Firewall
+-> 외부에서 들어오는 불필요한 접근을 제한한다.
+
+■ NAT 예시
+
+노트북 -> 192.168.0.2
+스마트폰 -> 192.168.0.3
+태블릿 -> 192.168.0.4
+
+각 장치는 서로 다른 Private IP를 사용하지만, 인터넷에 접속할 때는 공유기의 하나의 Public IP를 함께 사용할 수 있다.
+
+■ 핵심 정리
+
+가정용 공유기는 일반적으로 Router + Switch + Wi-Fi AP + DHCP + NAT + 방화벽 기능을 함께 제공한다.
+
+=========================================
+[AWS에서 추가로 알아야 하는 네트워크]
+=========================================
+
+1. Public IP
+
+■ 정의
+
+Public IP는 인터넷에서 식별되고 접근될 수 있는 IP 주소이다.
+
+전 세계 인터넷에서 중복되지 않는 주소를 사용한다.
+
+■ 사용 예시
+
+- 인터넷에 공개되는 웹서버
+- 외부에서 SSH로 접속해야 하는 EC2
+- 외부 사용자가 접근하는 서비스
+
+■ AWS에서의 특징
+
+EC2에 Public IPv4 주소를 부여할 수 있다.
+
+그러나 Public IP가 있다는 사실만으로 외부 접속이 가능한 것은 아니다.
+
+다음 조건들이 함께 필요하다.
+
+- 서브넷에 Internet Gateway로 향하는 경로가 있어야 함
+- EC2에 Public IP 또는 Elastic IP가 있어야 함
+- Security Group에서 필요한 포트를 허용해야 함
+- NACL이 해당 통신을 차단하지 않아야 함
+- 서버 내부 방화벽과 애플리케이션이 정상적으로 실행되어야 함
+
+■ Elastic IP
+
+EC2의 일반 Public IP는 인스턴스를 중지 후 다시 시작하면 변경될 수 있다.
+
+Elastic IP는 AWS에서 할당받는 고정 Public IPv4 주소이다.
+
+■ 핵심 정리
+
+Public IP는 인터넷에서 접근 가능한 주소이지만, 실제 접근 가능 여부는 ***라우팅과 방화벽 설정***까지 함께 결정한다.
+
+-----------------------------------------
+
+2. Private IP
+
+■ 정의
+
+Private IP는 인터넷에서 직접 접근할 수 없으며, 내부 네트워크에서 사용하는 IP 주소이다.
+
+■ 대표적인 Private IP 범위
+
+10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+
+■ 사용 예시
+
+- RDS 데이터베이스
+- 내부 ETL 서버
+- 내부 API 서버
+- 애플리케이션 서버 간 통신
+- 같은 VPC 내부의 EC2 간 통신
+
+■ 특징
+
+EC2 인스턴스에는 기본적으로 Private IP가 할당된다.
+
+같은 VPC 안의 자원은 주로 Private IP를 이용해 통신한다.
+
+Private IP는 인터넷에서 직접 라우팅되지 않는다.
+
+■ Private IP를 사용하는 이유
+
+- 외부 공격 노출 감소
+- 내부 통신 전용
+- Public IP 부족 문제 완화
+- 네트워크 구조와 보안 관리 용이
+
+■ 핵심 정리
+
+Public IP는 인터넷 통신용이고, Private IP는 VPC 내부 통신용이다.
+
+-----------------------------------------
+
+3. VPC (Virtual Private Cloud)
+########################
+VPC 안에는 CIDR에 의한 Private IP들이 있고 추가로  네트워크 구성 요소(Subnet, Route Table, Internet Gateway, NAT Gateway, Security Group, NACL)가 있음
++ Public IP는 해당 리소스에 필요할 때 별도로 부여!!!!
+########################
+
+■ 정의
+
+VPC는 AWS 안에서 사용자가 직접 구성하는 논리적으로 격리된 가상 네트워크이다.
+
+쉽게 말하면
+
+AWS 안에 만드는 나만의 사설 네트워크 또는 회사 네트워크이다.
+
+■ VPC를 만들 때 정하는 것
+
+- IP 주소 범위(CIDR)
+- Subnet
+- Route Table
+- Internet Gateway
+- NAT Gateway
+- Security Group
+- NACL
+
+■ 예시
+
+VPC CIDR -> 10.0.0.0/16
+
+이 VPC 안에서
+
+Public Subnet -> 10.0.1.0/24
+Private Subnet -> 10.0.2.0/24
+
+처럼 나눌 수 있다.
+
+■ VPC의 역할
+
+- 다른 AWS 고객의 네트워크와 논리적으로 격리
+- AWS 자원 간 내부 통신 제공
+- 인터넷 연결 여부 통제
+- 서브넷과 라우팅 구성
+- 접근 권한과 보안 정책 적용
+
+■ 주의
+
+VPC 자체가 인터넷과 자동으로 연결되는 것은 아니다.
+
+**인터넷 연결이 필요하면 Internet Gateway와 Route Table 설정이 필요하다.**
+
+■ 핵심 정리
+
+VPC는 AWS 자원을 배치하고 서로 통신하게 만드는 전체 가상 네트워크의 경계이다.
+
+-----------------------------------------
+
+4. Subnet
+
+■ 정의
+
+Subnet은 VPC의 IP 주소 범위를 더 작은 네트워크 단위로 나눈 것이다. -> public, private로도 나눌수있게해줌
+
+■ 중요한 특징
+
+AWS에서 하나의 Subnet은 반드시 하나의 ***가용 영역(AZ)에 속한다***
+또한 서로 전부 다르게 해야한다가 아니라 중복은 가능하지만 다르게 하면 고가용성에 좋다
+
+예시
+
+서울 리전 VPC
+-> ap-northeast-2a의 Public Subnet
+-> ap-northeast-2b의 Public Subnet : 10.0.1.0/24
+-> ap-northeast-2a의 Private Subnet : 10.0.2.0/24
+-> ap-northeast-2b의 Private Subnet
+
+여러 AZ에 Subnet을 나누면 장애에 대비한 고가용성 구성이 가능하다.
+
+■ Public Subnet
+
+Internet Gateway로 향하는 경로가 Route Table에 존재하는 Subnet이다.
+(Internet Gateway: VPC와 인터넷 사이의 통신을 가능하게 하는 AWS 네트워크 구성 요소)
+(Route Table: 네트워크 트래픽을 어느 목적지로 보낼지 정하는 경로표)
+
+대표적인 경로
+
+0.0.0.0/0 -> Internet Gateway
+
+Public Subnet에 EC2를 배치했다고 해서 무조건 인터넷 접속이 가능한 것은 아니다.
+
+EC2에 Public IP가 있어야 하고 Security Group도 허용되어야 한다.
+
+■ Public Subnet 배치 예시
+
+- 인터넷 공개 웹서버
+- Bastion Host
+- 인터넷과 직접 통신하는 Load Balancer
+- NAT Gateway
+
+■ Private Subnet
+
+Internet Gateway로 직접 향하는 경로가 없는 Subnet이다.
+
+외부 인터넷에서 내부 자원으로 직접 접근하기 어렵게 구성한다.
+
+■ Private Subnet 배치 예시
+
+- RDS
+- 내부 애플리케이션 서버
+- ETL 서버
+- 민감한 데이터를 처리하는 서버
+
+■ 중요한 수정
+
+Public Subnet과 Private Subnet은 단순히 Public IP가 있느냐로 구분하는 것이 아니다.
+
+***public/private의 구분 기준은 해당 Subnet의 Route Table에 Internet Gateway로 향하는 직접 경로가 있느냐이다***!!!!!!!!!!!
+
+■ 핵심 정리
+
+Subnet은 VPC를 용도와 보안 수준에 따라 나누는 네트워크 단위이다.
+
+-----------------------------------------
+
+5. Route Table
+
+■ 정의
+
+Route Table은 네트워크 트래픽을 어느 목적지로 보낼지 정하는 경로표이다.
+
+■ 구성 요소
+
+***Destination -> 목적지 IP 범위(최종 목적지)***
+***Target -> 트래픽을 보낼 대상(당장의 다음 목적지: 중간 경로 목적지일수도 있고 최종 목적지가 될 수도 있음)***
+
+■ 예시(route table의 구조: destination과 target둘다 표시)
+(destination) ->  (target)
+10.0.0.0/16 -> local
+0.0.0.0/0 -> Internet Gateway
+
+첫 번째 규칙
+-> 같은 VPC 내부 통신은 VPC 내부에서 처리
+
+두 번째 규칙
+-> 그 외 모든 IPv4 트래픽은 Internet Gateway로 전송
+
+■ Public Subnet Route Table 예시
+
+10.0.0.0/16 -> local
+0.0.0.0/0 -> Internet Gateway
+
+■ Private Subnet Route Table 예시
+
+10.0.0.0/16 -> local
+0.0.0.0/0 -> NAT Gateway
+
+■ 핵심 정리
+
+Route Table은 트래픽의 길을 결정하며, Subnet이 Public인지 Private인지 결정하는 핵심 요소이다.
+
+-----------------------------------------
+
+6. Internet Gateway
+
+■ 정의
+
+Internet Gateway는 VPC와 인터넷 사이의 통신을 가능하게 하는 AWS 네트워크 구성 요소이다.
+
+**쉽게 말하면 VPC가 인터넷으로 나가는 출입문이다.**!!!!!
+
+■ 역할
+
+- VPC와 인터넷 연결
+- Public IP를 가진 AWS 자원과 인터넷 간 통신 지원
+- Public Subnet의 기본 인터넷 경로 대상
+
+■ 구성 조건
+
+Internet Gateway를 VPC에 연결
+-> Public Subnet의 Route Table에 경로 추가
+-> EC2에 Public IP 또는 Elastic IP 할당
+-> Security Group에서 필요한 통신 허용
+
+■ 대표 경로
+
+0.0.0.0/0 -> Internet Gateway
+
+0.0.0.0/0은 모든 IPv4 목적지를 의미한다->모든 IP주소 (/0이므로 고정X)
+
+■ 주의
+
+Internet Gateway를 VPC에 연결하기만 해서는 인터넷 접속이 되지 않는다.
+
+Route Table, Public IP, Security Group까지 올바르게 설정해야 한다.
+
+■ 핵심 정리
+
+Internet Gateway는 VPC와 인터넷을 연결하지만, 실제 통신 여부는 라우팅과 보안 설정이 함께 결정한다.
+
+-----------------------------------------
+
+7. NAT Gateway
+
+■ 정의
+###################################
+NAT Gateway는 Private Subnet에 있는 서버가 외부 인터넷으로 요청을 보낼 수 있도록 주소를 변환해주는 관리형 서비스이다.
+@@public subnet은 그냥 internet gateway로 내보낼수있지만 private subnet은 ig쓰면 보안에 문제가 생겨 이를 해결하고자 NAT gateway를 사용한다@@
+(ig를 쓰는순간 private의 의미가 사라짐)
+또한 NAT은 공유기가 해주며 내부ip를 하나로 합쳐서 외부와 이어주게끔 함
++ NAT으로는 외부에서 내부 절대 접근불가!!! only 내부에서 외부로
+##################################
+
+■ 필요한 이유
+
+Private Subnet의 서버도 다음 작업이 필요할 수 있다.
+
+- 운영체제 업데이트
+- 패키지 다운로드
+- 외부 API 호출
+- 라이브러리 설치
+- 외부 저장소 접근
+
+그러나 외부 인터넷에서 해당 서버로 "직접 접속하는 것은 막고" 싶을 수 있다.
+
+이때 NAT Gateway를 사용한다.
+
+■ 통신 흐름!!!
+
+Private Subnet의 EC2
+-> Private Subnet Route Table
+-> Public Subnet의 NAT Gateway (NAT은 public에 배치하는게 원칙)
+-> Internet Gateway
+-> 인터넷
+
+응답은 해당 연결을 따라 다시 Private EC2로 돌아온다.
+
+■ 배치 위치
+
+***NAT Gateway는 Public Subnet에 배치한다.***
+
+또한 NAT Gateway에는 Elastic IP가 연결된다.
+
+■ Private Subnet Route Table
+
+0.0.0.0/0 -> NAT Gateway
+
+■ 중요한 특징
+
+Private EC2가 먼저 외부에 요청을 보내는 것은 가능하다.
+
+외부 사용자가 NAT Gateway를 통해 Private EC2에 새로운 연결을 직접 시작할 수는 없다.
+
+■ 주의
+
+NAT Gateway는 인터넷에서 Private Subnet으로 들어오는 출입문이 아니다.
+
+Private Subnet 자원의 외부 방향 통신을 지원하는 장치이다.
+
+■ 핵심 정리
+
+NAT Gateway는 Private 서버의 아웃바운드 인터넷 통신은 허용하면서 외부의 직접 인바운드 접근은 막는다.
+
+-----------------------------------------
+
+8. Security Group
+
+■ 정의
+
+Security Group은 EC2, RDS, Load Balancer 등의 AWS 자원에 적용하는 가상 방화벽이다.
+즉 AWS ***자원 단위***의 상태 ""저장"" 방화벽
+
+■ 적용 단위
+
+Subnet 전체가 아니라 "개별 AWS 자원" 또는 네트워크 인터페이스 단위로 적용된다.
+
+■ 규칙 종류
+
+Inbound Rule
+-> 외부에서 자원으로 들어오는 통신 허용
+
+Outbound Rule
+-> 자원에서 외부로 나가는 통신 허용
+
+■ 예시
+
+SSH 접속 허용
+TCP 22 -> 내 IP만 허용
+
+웹사이트 공개(전세계 모든 사람한테 허용할려면 0.0.0.0/0으로)
+TCP 80 -> 0.0.0.0/0 허용
+TCP 443 -> 0.0.0.0/0 허용
+
+RDS MySQL 접속
+TCP 3306 -> 웹서버 Security Group이 붙은 RDS만 허용
+
+■ Stateful
+
+Security Group은 상태 저장(Stateful) 방식이다.
+
+허용된 요청이 들어오면 해당 요청에 대한 응답 트래픽은 별도의 ***반대 방향 규칙이 없어도 허용***된다.
+
+예시
+
+클라이언트가 허용된 443번 포트로 서버에 요청
+-> 서버가 클라이언트에 보내는 응답은 자동 허용
+
+■ 허용 규칙만 존재
+
+Security Group은 **허용(Allow) 규칙만** 지정할 수 있다.
+
+특정 트래픽을 명시적으로 거부하는 규칙은 만들 수 없다.
+
+->규칙에 없는 트래픽은 기본적으로 차단된다.
+
+■ 보안상 주의
+
+SSH 22번을 0.0.0.0/0으로 열면 전 세계에서 접근을 시도할 수 있으므로 위험하다.
+
+가능하면 내 IP 또는 회사 네트워크에서만 접근하도록 제한한다.
+
+■ 핵심 정리
+
+Security Group은 AWS 자원 단위의 상태 저장 방화벽이며, 필요한 통신만 허용한다.
+
+-----------------------------------------
+
+9. CIDR (Classless Inter-Domain Routing)
+
+■ 정의
+
+CIDR은 IP 주소의 범위를 표현하는 방법이다.
+
+예시(기본적으로 192.168.0.0으로 4자리)
+
+슬래시 뒤의 숫자는 IP 주소에서 네트워크 부분으로 고정되는 비트 수를 의미한다.
+
+| CIDR  | 의미           | 포함 범위    |
+| ----- | ------------ | -------- |
+| `/0`  | 아무 것도 고정 안 함 | 모든 IP    |
+| `/8`  | 첫 번째 숫자 고정   | 10.x.x.x |
+| `/16` | 앞 두 자리 고정    | 10.0.x.x |
+| `/24` | 앞 세 자리 고정    | 10.0.1.x |
+| `/32` | 전부 고정        | IP 하나만   |
+
+
+■ 기본 이해
+
+/16 -> 비교적 넓은 IP 범위
+/24 -> /16보다 작은 IP 범위
+숫자가 커질수록 사용할 수 있는 IP 주소 범위는 작아진다.
+
+■ 대략적인 주소 수
+
+/16 -> 65,536개 주소
+/24 -> 256개 주소
+/28 -> 16개 주소
+
+AWS Subnet에서는 각 Subnet CIDR의 일부 IP 주소를 AWS가 예약하므로 모든 주소를 사용자 자원에 할당할 수 있는 것은 아니다.
+
+■ 예시
+
+VPC -> 10.0.0.0/16
+
+Public Subnet A -> 10.0.1.0/24
+Private Subnet A -> 10.0.2.0/24
+Public Subnet B -> 10.0.3.0/24
+Private Subnet B -> 10.0.4.0/24
+
+**각 Subnet의 IP 범위가 서로 겹치면 안 된다.**
+
+■ 교육 전 학습 수준
+
+복잡한 서브넷 계산을 능숙하게 할 필요는 없다.
+
+다음 정도만 알면 된다.
+
+- CIDR은 IP 범위를 표현한다.
+- /16이 /24보다 넓다.
+- Subnet끼리 IP 범위가 겹치면 안 된다.
+-***VPC의 CIDR 안에서 Subnet CIDR을 나눈다.***
+
+■ 핵심 정리
+
+CIDR은 VPC와 Subnet에서 사용할 수 있는 IP 주소의 범위를 정의한다.
+
+-----------------------------------------
+
+10. NACL (Network Access Control List)
+
+■ 정의
+
+NACL은 Subnet으로 들어오고 나가는 네트워크 트래픽을 제어하는 방화벽이다.
+-> **Subnet 단위**의 상태 **비저장** 방화벽
+
+■ 적용 단위
+
+Security Group -> 개별 자원 단위
+NACL -> Subnet 단위
+
+■ 규칙 종류
+
+Inbound Rule -> Subnet으로 들어오는 트래픽
+Outbound Rule -> Subnet에서 나가는 트래픽
+
+■ Stateless
+
+NACL은 상태 비저장(Stateless) 방식이다.
+
+들어오는 요청을 허용했더라도 나가는 **반대 응답 트래픽도 별도로 지정**해서 허용해야 한다.
+
+■ **허용과 거부 둘다 가능**
+
+NACL은 Allow와 Deny 규칙을 모두 설정할 수 있다.
+
+■ 규칙 번호
+
+NACL 규칙에는 번호가 있다.
+
+번호가 낮은 규칙부터 확인하고 처음 일치한 규칙을 적용한다.
+
+예시
+
+100 -> 특정 IP 허용
+110 -> 특정 IP 거부
+
+100번에서 먼저 허용되면 뒤의 110번 규칙까지 확인하지 않는다.
+
+■ Security Group과 비교
+
+Security Group
+- 자원 단위
+- Stateful
+- 허용 규칙만 가능
+- 모든 규칙을 종합적으로 평가
+- 일반적으로 주된 접근 제어 수단
+
+NACL
+- Subnet 단위
+- Stateless
+- 허용과 거부 모두 가능
+- 낮은 규칙 번호부터 순서대로 평가
+- Subnet 전체에 대한 추가 보호 계층
+
+■ 핵심 정리
+
+NACL은 Subnet 단위의 상태 비저장 방화벽이며, Security Group보다 넓은 범위에서 추가 보안을 제공한다.
+
+=========================================
+[AWS 네트워크의 올바른 전체 구조]
+=========================================
+
+■ 기본 구조
+
+Internet
+-> Internet Gateway
+-> VPC
+-> Route Table
+-> Public Subnet 또는 Private Subnet
+-> EC2, Load Balancer, RDS 등의 AWS 자원
+
+-----------------------------------------
+
+■ 일반적인 웹 서비스 구조
+
+사용자
+-> 인터넷
+-> Internet Gateway
+-> Public Load Balancer
+-> Private Subnet의 애플리케이션 서버
+-> Private Subnet의 RDS
+
+-----------------------------------------
+
+■ Public Subnet의 서버가 인터넷과 통신하는 구조
+
+인터넷 사용자
+-> Internet Gateway
+-> Public Subnet Route Table
+-> Public IP가 있는 EC2
+-> Security Group에서 허용된 포트로 접속
+
+-----------------------------------------
+
+■ Private Subnet 서버가 인터넷으로 나가는 구조
+
+Private EC2
+-> Private Subnet Route Table
+-> Public Subnet의 NAT Gateway
+-> Internet Gateway
+-> 인터넷
+
+-----------------------------------------
+
+■ 중요한 위치 관계
+
+Internet Gateway
+-> VPC에 연결
+
+NAT Gateway
+-> Public Subnet에 배치
+
+Public EC2
+-> Public Subnet에 배치하고 Public IP 필요
+
+Private EC2 / RDS
+-> Private Subnet에 배치
+
+Security Group
+-> EC2, RDS, Load Balancer 등 개별 자원에 적용
+
+NACL
+-> Subnet에 적용
+
+Route Table
+-> Subnet의 트래픽 이동 경로 결정
+
+=========================================
+[교육 전에 꼭 구분해야 할 개념]
+=========================================
+
+Public IP
+-> 인터넷에서 사용하는 주소
+
+Private IP
+-> VPC 내부에서 사용하는 주소
+
+VPC
+-> AWS 안의 전체 가상 네트워크
+
+Subnet
+-> VPC를 더 작은 네트워크로 나눈 단위
+
+Route Table
+-> 트래픽이 이동할 경로를 결정
+
+Internet Gateway
+-> VPC와 인터넷을 직접 연결
+
+NAT Gateway
+-> Private 서버가 외부 인터넷으로 나가도록 지원
+
+Security Group
+-> AWS 자원 단위의 상태 저장 방화벽
+
+NACL
+-> Subnet 단위의 상태 비저장 방화벽
+
+CIDR
+-> IP 주소 범위를 표현하는 방식
+
+=========================================
+[최종 핵심 흐름]
+=========================================
+
+외부 사용자가 웹서버에 접속
+
+DNS로 도메인의 IP 주소 확인
+-> 인터넷을 통해 AWS로 요청
+-> Internet Gateway 통과
+-> Route Table이 목적지 경로 결정
+-> NACL이 Subnet 수준에서 트래픽 확인
+-> Security Group이 자원 수준에서 포트 확인
+-> EC2 또는 Load Balancer가 요청 수신
+-> HTTP/HTTPS 요청 처리
+-> 서버가 응답 반환
+
+-----------------------------------------
+
+Private 서버가 외부 API 호출
+
+Private EC2에서 요청 발생
+-> Private Subnet Route Table
+-> NAT Gateway
+-> Internet Gateway
+-> 외부 API 서버
+-> 응답이 기존 연결을 따라 Private EC2로 반환
+
+=========================================
+[최종 결론]
+=========================================
+
+교육 전에는 네트워크를 직접 설계할 수준까지 공부할 필요는 없다.
+
+다만 다음 내용은 정확하게 구분해야 한다.
+
+1. VPC는 AWS의 전체 가상 네트워크이다.
+
+2. Subnet은 VPC를 용도와 가용 영역별로 나눈 네트워크이다.
+
+3. Public Subnet은 Internet Gateway로 향하는 직접 경로가 있는 Subnet이다.
+
+4. Private Subnet은 Internet Gateway로 향하는 직접 경로가 없으며, 외부 인터넷 통신이 필요하면 NAT Gateway를 이용한다.
+
+5. Internet Gateway는 VPC와 인터넷을 직접 연결한다.
+
+6. NAT Gateway는 Private 서버의 외부 방향 통신을 지원하며 Public Subnet에 배치한다.
+
+7. Route Table은 트래픽이 이동할 경로를 결정한다.
+
+8. Security Group은 개별 AWS 자원에 적용되는 Stateful 방화벽이다.
+
+9. NACL은 Subnet에 적용되는 Stateless 방화벽이다.
+
+10. Public IP가 있다고 무조건 인터넷 접속이 되는 것은 아니며 Route Table, Internet Gateway, Security Group 등의 설정이 함께 필요하다.
+
+교육 전 목표는 각 개념의 정의를 외우는 것보다, 데이터와 요청이 어떤 경로를 거쳐 이동하는지 이해하는 것이다.
