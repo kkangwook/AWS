@@ -1,3 +1,65 @@
+ / 루트
+│
+├─ /home : 일반 사용자의 개인 파일과 설정이 저장되는 디렉토리
+│  ├─ /home/$USER : 현재 사용자의 홈 디렉토리 → ex) cd "$HOME" (홈 디렉토리로 이동), ls -la "$HOME" (숨김 파일까지 확인)
+│  ├─ ~/.bashrc : Bash 환경변수·PATH·alias 설정 파일 → ex) grep "PATH" ~/.bashrc (PATH 관련 설정 확인), source ~/.bashrc (수정 내용 적용)
+│  └─ ~/.ssh : SSH 키와 접속 설정 디렉토리 → ex) ls -la ~/.ssh (SSH 관련 파일 확인), less ~/.ssh/config (SSH 접속 설정 확인)
+│
+├─ /etc : 운영체제와 서비스의 설정 파일이 저장되는 디렉토리
+│  ├─ /etc/passwd : 사용자 계정 정보 → ex) grep "^${USER}:" /etc/passwd (현재 사용자 계정 정보 가져오기)
+│  ├─ /etc/group : 사용자 그룹 정보 → ex) groups "$USER" (현재 사용자가 속한 그룹 확인), grep "^sudo:" /etc/group (sudo 그룹 정보 확인)
+│  ├─ /etc/shells : 사용 가능한 로그인 셸 목록 → ex) cat /etc/shells (사용 가능한 셸 확인)
+│  ├─ /etc/hosts : 호스트명과 IP 주소의 수동 연결 정보 → ex) cat /etc/hosts (등록된 호스트명과 IP 확인)
+│  ├─ /etc/hostname : 현재 서버의 호스트명 → ex) cat /etc/hostname (서버 호스트명 확인)
+│  ├─ /etc/resolv.conf : DNS 서버 설정 → ex) cat /etc/resolv.conf (사용 중인 DNS 서버 확인)
+│  ├─ /etc/os-release : 리눅스 배포판 정보 → ex) cat /etc/os-release (Ubuntu·Rocky 등 배포판과 버전 확인)
+│  ├─ /etc/services : 서비스명과 대표 포트 번호 대응표 → ex) grep -E "^(ssh|http|https)[[:space:]]" /etc/services (SSH·HTTP·HTTPS 포트 확인)
+│  ├─ /etc/fstab : 부팅할 때 자동으로 연결할 디스크 설정 → ex) cat /etc/fstab (자동 마운트 설정 확인)
+│  └─ /etc/ssh/sshd_config : SSH 서버 설정 → ex) grep -Ev '^[[:space:]]*(#|$)' /etc/ssh/sshd_config (주석·빈 줄을 제외한 SSH 설정 확인)
+│
+├─ /usr : 설치된 명령어와 프로그램 라이브러리가 저장되는 디렉토리
+│  ├─ /usr/bin : 일반 사용자가 사용하는 명령어 → ex) command -v grep (실행되는 grep의 위치 확인), ls /usr/bin | less (명령어 목록 확인)
+│  ├─ /usr/sbin : 시스템 관리용 명령어 → ex) command -v useradd (useradd 명령어 위치 확인)
+│  ├─ /usr/lib : 프로그램이 사용하는 라이브러리 → ex) ldd /usr/bin/grep (grep이 사용하는 공유 라이브러리 확인)
+│  └─ /usr/local/bin : 직접 설치한 명령어와 사용자 스크립트 → ex) ls -l /usr/local/bin (직접 설치된 명령어 확인)
+│
+├─ /bin : 필수 일반 명령어가 위치하던 디렉토리이며 현재는 /usr/bin의 심볼릭링크 (sbin/lib도 각각 usr의 소프트링크)
+│  └─ /bin/bash : Bash 셸 프로그램 자체 → ex) /bin/bash --version (Bash 버전 확인), readlink -f /bin/bash (실제 파일 위치 확인)
+│
+├─ /var : 로그와 같이 실행 중 계속 변경되는 데이터가 저장되는 디렉토리
+│  ├─ /var/log : 시스템과 애플리케이션 로그 → ex) ls -lh /var/log (로그 파일 목록 확인), tail -f /var/log/syslog (시스템 로그 실시간 확인)
+│  ├─ /var/lib : Docker·DB 등 프로그램의 상태 데이터 → ex) sudo du -sh /var/lib/* (프로그램별 데이터 용량 확인)
+│  ├─ /var/cache : 프로그램이 다시 생성할 수 있는 캐시 → ex) sudo du -sh /var/cache/* (캐시별 용량 확인)
+│  └─ /var/tmp : 재부팅 후에도 남을 수 있는 임시 파일 → ex) ls -la /var/tmp (임시 파일 확인)
+│
+├─ /proc : 실행 중인 프로세스와 커널 정보를 보여주는 가상 디렉토리
+│  ├─ /proc/cpuinfo : CPU 상세 정보 → ex) grep "^model name" /proc/cpuinfo (CPU 모델명 확인), lscpu (CPU 정보 요약)
+│  ├─ /proc/meminfo : 메모리 상세 정보 → ex) grep -E "MemTotal|MemAvailable" /proc/meminfo (전체·사용 가능 메모리 확인), free -h (메모리 사용량 요약)
+│  ├─ /proc/version : 실행 중인 커널 정보 → ex) cat /proc/version (커널 상세 정보 확인), uname -r (커널 버전 확인)
+│  ├─ /proc/uptime : 서버가 부팅된 후 지난 시간 → ex) uptime (서버 가동 시간과 부하 확인)
+│  └─ /proc/PID : 해당 PID 프로세스의 실행 정보 → ex) cat /proc/1234/status (PID 1234 상태 확인), readlink -f /proc/1234/exe (실행 파일 확인)
+│
+├─ /dev : 디스크·터미널 같은 장치를 파일 형태로 나타내는 디렉토리
+│  ├─ /dev/sda·/dev/nvme0n1 : 서버의 디스크 장치 → ex) lsblk -f (디스크·파티션·파일시스템 확인)
+│  ├─ /dev/tty : 현재 터미널 장치 → ex) tty (현재 사용 중인 터미널 확인)
+│  └─ /dev/null : 전달된 출력을 버리는 특수 장치 → ex) find /etc -name "*.conf" 2>/dev/null (권한 오류를 숨기고 설정 파일 검색)
+│
+├─ /run : 현재 부팅 중인 서비스의 PID·소켓 등 실행 정보
+│  └─ /run/*.pid : 실행 중인 프로그램의 PID 파일 → ex) find /run -name "*.pid" 2>/dev/null (PID 파일 검색)
+│
+├─ /tmp : 작업 중 잠시 사용하는 임시 파일
+│  └─ /tmp : 재부팅이나 정책에 따라 파일이 삭제될 수 있음 → ex) mktemp -d (안전한 임시 디렉토리 생성), ls -la /tmp (임시 파일 확인)
+│
+├─ /mnt : 관리자가 외부 디스크나 파일시스템을 임시로 연결하는 위치
+│  └─ /mnt : 직접 마운트한 파일시스템 접근 → ex) findmnt (현재 마운트 상태 확인), df -h (파일시스템별 용량 확인)
+│
+├─ /media : USB 같은 이동식 장치가 자동 연결되는 위치
+│  └─ /media : 자동 마운트된 이동식 장치 접근 → ex) ls -la /media (연결된 이동식 장치 확인)
+│
+└─ /opt : 독립적으로 배포되는 외부 프로그램의 설치 위치
+   └─ /opt/프로그램명 : 외부 프로그램별 설치 파일 → ex) ls -la /opt (설치된 외부 프로그램 확인)
+
+
 vi편집기 명령어
 vimtutor -g ko
 p121 vi편집기에 line넘버 나오게하기
@@ -106,6 +168,21 @@ ls해서 파란색이면 디렉토리, 흰색이면 그냥파일
 	서브디렉토리==하위디렉토리
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
+- 내용을 무조건 그대로 사용 → ' '
+	echo '현재 위치는 $(pwd)' ->결과: 현재 위치는 $(pwd)
+
+- **변수**나 **명령어** 내부에 있으면 사용하는거 → " " (파일, 디렉토리는 ' '에 감싸도 상관X)
+	echo "현재 위치는 $(pwd)" -> 결과: 현재 위치는 /home/woohyun
+
+- 와일드카드는 무조건 '', "" 밖에 -> "%(와일드카드)"는 가능
+
+- echo "$(a)'$(b)'"  -> a실행값 ' b실행값 '  이렇게 표시됨
+	%(b)그대로 표현하고 싶으면 "$(a)"'%(b)'로 해야함
+	왜냐면 "안에 들어간 순간 '는 그냥 '임!!!!!!
+
+grep "$(whoami)" /etc/passwd   -> ""안이면 실행돼서 그 실행값이 woohyun으로 찾게됨
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
 -touch	touch <옵션> <파일명>
 	touch new.file로 새로운 파일 생성
 	옵션: a,m,d등으로 시간변경
@@ -156,6 +233,7 @@ ls해서 파란색이면 디렉토리, 흰색이면 그냥파일
 	mv 파일 파일 : 이름바꾸기
 	mv 파일 디렉토리 : 디렉토리 안으로 이동
 	mv 디렉토리 디렉토리 : 디렉토리 이름 바꾸기 or 이미 있는 디렉토리면 디렉토리 안으로 이동!!!!!!!!!!
+		(r필요 X)
 	-옵션:
 	- i : 대상 파일이 존재하면 덮어쓰기 전에 확인
 	- f : 대상 파일이 존재해도 강제로 덮어씀
@@ -168,7 +246,7 @@ ls해서 파란색이면 디렉토리, 흰색이면 그냥파일
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 -find		find <어디서부터 찾을지> <어떤 기준으로 찾을지> <표현식>  -> 파일하나하나 출력
-	ex) find /var/log -name "*.log"
+	ex) find /var/log -name "*.log"    <- find가 특수한 경우라 ""안에!!!!!!
 	옵션: -name, -type f/d(file or dir), -size +-10M, -user
 	-검색 결과에 대한 명령 실행: 
 		find . -name 'test*' -exec ls -a \;     =>    test*를 찾은 후 추가로 ls-a로 명령하고\;로 끝마침
@@ -221,7 +299,7 @@ tab누르면 자동완성가능 (단 1개만 남았을때)
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 -sed		sed <옵션> <명령> <파일이름>   -> sed에서 모든 -e의 실행들은 마지막에 오는 파일에만 실행!!!!!
 
-	sed -n -e '1,$p' sample
+	sed -n -e '1,$p' sample    -> 만약 여기서 ""이었으면 $p를 변수로 입력 -> 그냥 1,$p값 그대로 sed에 넣기위해 ''사용!!!!!!
 	-n: 중복해서 출력하지마라 (pattern sapce꺼 출력하지마라, output만 보여줘라)
 	-e: 이 뒤에 명령문올거다
 	1: 첫번째줄
@@ -240,13 +318,31 @@ tab누르면 자동완성가능 (단 1개만 남았을때)
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 -awk			awk '조건 { 실행할 명령 }' 파일	
 	행=레코드, 열=필드형태 	: 전체=$0, 1열=$1, 2열=$2 ..... n열 $n
-	awk ‘{ print “Name:”$1, “Num:”$2 }’ sample		-> " "안에있는거는 그대로 출력
+	awk ‘{ print “Name:”$1, “Num:”$2 }’ sample		-> ''그대로 awk가 받아가야해서,  출력하려는 고정문자열은 " "로 감쌈
 	awk ‘$2 > 20 { print $0}’ sample			-> 조건문도 가능
-	awk ‘{ sum += $3} END { print “SUM : “sum}’ sample
-		-> END는 연산이 끝났음을 의미 -> 그냥 print하면 루프마다 나오지만 end하고 print하면 마지막 결과만 print
-	vi awkp.script하고 안에 c언어 함수만들고print -> awk -f awkp.script sample  하면 script안의 함수를 sample에 적용	
+	awk ‘{ sum += $3} END { print “SUM : “sum}’ sample     -> awk에서 변수들 초기값은 전부 0 -> 지정하고 싶으면 awk 'BEGIN { sum=0 } { sum += $3 } END { print "SUM:", sum }' sample
+		-> END는 모든 행을 처리한 다음 한 번 실행되게함 -> 그냥 print하면 루프마다 나오지만 end하고 print하면 마지막 결과만 print	
+		-> 최종버전: awk 'BEGIN { sum=0 } $2 > 20 { sum += $3 } END { print "SUM:", sum }' sample
+	vi awkp.script하고 안에 c언어 함수만들고print -> awk -f awkp.script sample  하면 script안의 함수를 sample에 적용(f옵션은 file로 script적용시키고 싶을때 사용)
 
 # sed든 awk든 script안에서 함수로 유용하게 사용하므로 알아두면 좋음
+#이때 awk스크립트랑 쉘 스크립트랑 문법구조 다름
+awk:
+BEGIN {
+    sum = 0
+}
+
+$2 > 20 {
+    sum += $3   #or 여기에 print "SUM : " sum해서 매 행마다 나오게
+}
+
+END {
+    print "SUM : " sum
+}
+-> awk -f /full_path/awkp.scripts sample하면 바로 사용가능하지만
+-> 그냥 full_path/awkp.scripts sample 로 쓸려면 스크립트 첫줄에 #!/usr/bin/awk -f과 chmod +x 필요 
+
+
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 -프로세스개념
@@ -277,6 +373,7 @@ foreground/background
 	Foreground는 현재 터미널을 차지하고 실행되는 프로세스 -> sleep100하면 100초간 터미널에서 암것도 못함
 	sleep 100 &	-> 명령 뒤에 &를 붙이면 Background에서 실행 -> 내 터미널에서는 계속 가능
 	즉 백그라운드는 뒤에서 실행되는 여러 프로세스
+	-> ps aux | grep sleep으로 어떤 pid인지 확인 가능
 
 signal: 실행 중인 프로세스에게 보내는 제어 메시지   : 종료!, 멈춰! 계속!
 	ex)
@@ -359,6 +456,10 @@ signal: 실행 중인 프로세스에게 보내는 제어 메시지   : 종료!,
 | `$USER`     | 현재 사용자 이름       | `woohyun`                      |
 | `$HOME`     | 현재 사용자의 홈 디렉터리  | `/home/woohyun`                |
 | `$PATH`     | 명령어를 찾는 디렉터리 목록 | `/usr/bin:/bin:...`            |
+	echo $PATH -> /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ( :로 나누면 됨)
+		1. 일시적으로 사용: export PATH="$HOME/myscripts:$PATH" -> 내 스크립트가 우선하겠다(동일이름이면)
+			          export PATH="$PATH:$HOME/myscripts" -> 기존 스크립트 우선하겠다
+		2. 껐다 켜도 그대로 사용: vi ~/.bashrc -> export PATH="$PATH:$HOME/myscripts"내용 안에 추가 -> source ~/.bashrc로 혹시모르니 즉시 반영시킴
 | `$SHELL`    | 사용자의 기본 로그인 셸   | `/bin/bash`                    |
 | `$PWD`      | 현재 작업 디렉터리      | `/home/woohyun/test`           |
 | `$OLDPWD`   | 바로 이전 작업 디렉터리   | `/home/woohyun`                |
@@ -367,6 +468,10 @@ signal: 실행 중인 프로세스에게 보내는 제어 메시지   : 종료!,
 | `$TERM`     | 사용 중인 터미널 종류    | `xterm-256color`               |
 
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+$(HOME)은 안됨!!!!!!!!1
+	-> $변수 or $(명령어 or 스크립트)로 둘중 하나로 사용해야하기때문
+	-> 그리고 저 위의 것들은 환경**변수**
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 -일반변수/환경변수
@@ -374,6 +479,15 @@ signal: 실행 중인 프로세스에게 보내는 제어 메시지   : 종료!,
 	환경변수: 현재 셸의 프로세스 + 그 자식 프로세스에도 상속 가능한 변수
 		export x=woohyun 에서 export앞에 붙이면 환경변수로 가능
 	env로 환경변수들 보여줌 -> env | grep fname하면 fname포함된 환경변수만 보여줌
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+명령어도 결국 쉘 스크립트야? -> 이건 아니고 그냥 명령어중에 쉘 스크립트가 포함(비슷한거라보면됨)
+그러면 우리가 쓰는 명령어들 그냥 쓸수있는이유가 명령어들이 /usr/bin에 들어있는데 이 경로가 $path(환경변수)에 포함돼서 가능한거야? ->맞음
+그러면 만약 어떤 새로운 디렉토리가 있고 거기에 스크립트를 만들었는데 그것도 맘대로 환경변수처럼 쓸려면 그 해당 디렉토리를 $path에 지정해놓으면 되는거야?
+	-> 맞음. 근데 export PATH="$PATH:$HOME/myscripts" 해도 터미널 끄면 사라짐
+-> 따라서 .bashrc에 추가하면 앞으로 계속 사용가능
+	-> vi ~/.bashrc -> export PATH="$PATH:$HOME/myscripts" -> source ~/.bashrc하면 됨
+-> 아니면 그냥 full_path/myscripts로 사용가능
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 .bashrc 와 path	(vi .bashrc에 환경변수, 일반변수, 지정한 alias등이 저장돼있음)
@@ -492,7 +606,7 @@ read		read <옵션> 변수명
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 printf		printf format <메시지>
-	printf "var_a: %s \t var_b: %i\n" a 10	-> 출력값: var_a: a	var_b: 10   (\n은 그냥 다음줄로)
+	printf "var_a: %s \t var_b: %i\n" "$a" b	-> 출력값: var_a: 변수a, var_b: b문자열   (\n은 그냥 다음줄로)
 	%d or %i 숫자
 	%s 문자열
 	%f 실수형 숫자
@@ -506,6 +620,7 @@ $ vi temp
 echo -n "Enter the celcius : "
 read celcius
 fah=$((celcius*9/5+32))			# $celcius해도 되고 안해도 됨 -> $( )안에 들어가는 모든 캐릭터는 변수들!!!!!
+	# -> 산술계산은 괄호 2개!!!!! 
 printf "fahrenheit is %d\n" "$fah"
 
 chmod -x temp
