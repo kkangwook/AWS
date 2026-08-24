@@ -616,7 +616,7 @@ printf		printf format <메시지>
 ------------------문제 섭씨온도 입력받아 화씨온도return하는 스크립트짜기---------------------
 $ vi temp
 
-#! /bin/bash
+#!/bin/bash
 echo -n "Enter the celcius : "
 read celcius
 fah=$((celcius*9/5+32))			# $celcius해도 되고 안해도 됨 -> $( )안에 들어가는 모든 캐릭터는 변수들!!!!!
@@ -626,3 +626,267 @@ printf "fahrenheit is %d\n" "$fah"
 chmod -x temp
 temp
 ------------------------------------------------------------------------------------------------------------
+
+id는 되고 $id는 안됨 -> id는 명령어이므로 쓸려면 echo "$(id)"로 써야힘
+
+woohyun@woohyun-VirtualBox	앞이 사용자, 뒤가 호스트
+사용자(user) → 서버를 사용하는 계정
+호스트(host) → 사용자가 접속한 컴퓨터·서버
+
+stat file 로 파일의 접속,생성,변경등의 시간 확인 가능
+
+man -k 검색어       로 검색어와 관련된 명령어 뭐있는지 찾아줌
+
+whereis 명령어  : 해당 명령어 있는지 확인할때 사용
+
+sed와 awk둘다 편집기 -> sed는 행단위처리 awk는 행열로 나눠 조건 처리
+
+제일 위 부모 프로세스는 init과 kthreadd  => ps -ef했을때 pid1나오는애들 -> ppid=0이므로 얘네들의 부모 존재X
+
+.bashrc어디있는지 찾는법 -> find / -name .bashrc 2> /dev/null      #access denied에러 엄청많이 떠러 에러 안뜨게 하기 
+
+date날짜 나타내는법: date +%y-%m-%d-%H-%M-%S 	연/월/일/시간/분/초
+
+스크립트짤때 #!/bin/bash하는이유 : 그 쉘과 쉘의 문법, 그리고 쉘안에 있는 명령어, 스크립트들 쓰겠다
+
+비정상적으로 종료되고 echo $? 하면 1이 뜸 -> 일반 에러가 발생했다는 뜻, 0이뜨면 정상종료
+	$?에 전에 종료상태 어땠는지 저장
+
+sleep 100하고 ctrl+c하고 $?하면 130  -> 여기서 128뺌 -> 2 = sigint =sig interruption
+--------------------------------------------------------------------------------
+test $x 연산자 $y
+	연산자: -eq, -gt, -ge, -lt, -le, -ne
+	test $x -gt 5
+
+test <옵션> <파일 or 디렉토리>
+	옵션:
+	-e : 파일이 존재하면 true
+	-d : 파일이 존재하고, 디렉토리이면 true
+	-f : 파일이 존재하고, 일반 파일이면 true
+	-x : 파일이 존재하고, 실행 권한이 있으면 true
+	
+	ex) test -e /etc/passwd
+
+
+[ $x -lt 5 ]   <=양 옆에 공백 꼭 필요
+--------------------------------------------------------------------------------
+- 쉘의 조건명령어1: test사용하기
+#!/bin/bash
+
+echo -n "input the number: "
+read number
+
+if test "$number" -gt 5					# 여기에 그냥 ; then도 가능
+then
+    echo "greater than 5"
+else
+    echo "less than or equal to 5"
+fi
+
+----------------------------------------------
+
+#!/bin/bash
+if test -e /etc/passwd
+then
+	ls -l /etc/passwd
+else
+	echo " /etc/passwd file does not exist"
+fi
+--------------------------------------------------------------------------------
+- 쉘의 조건명령어2: [ ] 사용하기
+#!/bin/bash
+
+echo -n "enter the filename: "
+read filename
+
+if [ -e "$filename" ]; then
+    echo "file exists"
+else
+    echo "no file"
+fi
+--------------------------------------------------------------------------------
+
+
+-쉘의 조건명령어 3: (( ))사용하기
+#!/bin/bash
+
+echo -n "input the number: " ;read number
+
+if ((number % 2 == 0))		-> ((number%2==0)) 처럼 붙여쓰기도 가능
+then
+    echo "$number is even"     #printf "%d is the even\n" $number  해도 됨
+else
+    echo "$number is odd"
+fi
+--------------------------------------------------------------------------------
+
+
+-쉘의 조건 명령어4: 조건 여러개 출려하고싶을때 -> case
+#!/bin/bash
+
+echo -n "what do u want? (yes/no): "
+read answer
+
+case "$answer" in
+    yes)				#yes일경우 출력
+        echo "system restart"
+        ;;
+    no)				#no일경우 출력
+        echo "shutdown the system"
+        ;;
+    *)					#그 외일경우 출력
+        echo "entered incorrectly"
+        ;;
+esac
+--------------------------------------------------------------------------------
+-쉘의 조건 명령어 5: elif문
+#!/bin/bash
+
+echo -n "input the number: "
+read number
+
+if (( number > 5 )); then
+    echo "greater than 5"
+elif (( number >= 3 && number <= 5 )); then
+    echo "between 3 and 5"
+else
+    echo "less than 3"
+fi
+--------------------------------------------------------------------------------
+
+리눅스에서 """ """쓰는법
+cat << END
+내용			여기에 몇줄짜리 써도 됨 -> 그대로 출력
+END 	
+
+
+
+echo 
+-n "number : "
+read number
+case $number in
+1) df 
+-h ;;
+2) who ;;
+*) echo "Bad choice!"
+	exit 1 ;; 				# 3 입력 → Bad choice! 출력 → exit 1 → $?는 1
+esac
+exit 0						#정상 종료됨
+
+
+--------------------------------------------------------------------------------
+
+expr 10 연산자 5   연산자: + - '*' '/' % (이때 *,/는 이미 에스터리스크, 디렉토리관련 뜻이 있어서 홀따옴표로
+let도 있움
+하지만 (( ))로 expr과 let 대체!!!!!!!!!
+	ex) ((sum+=5))  if ((sum >5))
+	   if (( sum > 5 && sum < 10 )); then
+	   if (( sum < 5 || sum > 10 )); then
+
+단항연산(++)는 1씩 증가
+--------------------------------------------------------------------------------
+
+bc: 강력한 계산기 도구로서 다양한 수식을 계산하고 변수를 사용하여 작업할 수 있음
+소수점 -> bc로 가능 by scale값 지정
+
+echo "x = 5; x + 3" | bc
+echo "scale=2; 10 / 3" | bc    #bc가 앞의 수식 받아 출력, scale=2는 소수점 2번째 자리까지
+ bc -l < input.txt으로 이렇게 파일로 받기도 가능
+
+--------------------------------------------------------------------------------
+- while문: number: 1 ~ number: 5까지 출력하기
+#!/bin/bash
+num=1
+while test "$num" -le 5
+do
+    echo "Number: $num"
+    ((num++))
+done
+
+--------------------------------------------------------------------------------
+- until문: number: 1 ~ number: 5까지 출력하기
+#!/bin/bash
+num=1
+until test "$num" -gt 5
+do
+    echo "Number: $num"
+    ((num++))
+done
+
+--------------------------------------------------------------------------------
+1부터 100까지합
+#!/bin/bash
+
+sum=0
+num=1
+
+while test "$num" -lt 101
+do
+    ((sum += num))
+    ((num++))
+done
+
+echo "$sum"
+--------------------------------------------------------------------------------
+199p는 뭐야?
+--------------------------------------------------------------------------------
+-loop와 if 같이 사용하기 ->  1부터 10까지 수를 출력하고, 홀수인지 짝수인지 구분하시오.
+#!/bin/bash
+
+num=0
+
+while test "$num" -lt 10
+do
+    ((num++))			#여기 왜 $못씀? -> ++, --, +=처럼 변수의 값을 변경하는 연산에서는 변수명을 그대로 써야함!!!!!!
+						->왜냐하면 이미 while문에 들어온 상태인데 여기에 $num하면 while밖의 0값을 가지고 와서 계속 무한루프돼서!!!!
+    if (( num % 2 == 0 )); then
+        echo "$num is even"
+    else
+        echo "$num is odd"
+    fi
+done
+--------------------------------------------------------------------------------
+
+for문
+#!/bin/bash
+
+for num in 1 2 3 4 5 6 7 8 9 10
+do
+    echo "$num"
+done
+
+for num in $(seq 10)   위의 1 2.... 10과 같음
+do
+    echo "$num"
+done
+
+--------------------------------------------------------------------------------
+for file in ./* 로 모든 파일 매개변수로 가져올 수 있음
+--------------------------------------------------------------------------------
+- 입력한 모든 매개변수를 출력하는 쉘 프로그램을 작성 : this is arguments test
+#!/bin/bash
+for i in $@           		# $@는 입력값을 리스트 형태로
+do
+	echo "$i"
+done
+./c this is arguments test
+결과:
+this 
+is
+arguments
+test
+--------------------------------------------------------------------------------
+
+- 모든 매개변수의 합을 구하는 쉘 프로그램을 작성하시오.
+#!/bin/bash
+
+sum=0
+for i in "$@"
+do
+    ((sum += i))
+done
+
+echo "$sum"
+
+./c 10 20 30 40하면 100출력
+--------------------------------------------------------------------------------
