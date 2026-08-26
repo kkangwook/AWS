@@ -109,11 +109,12 @@ df -h: 리눅스 시스템 "전체"에 디스크 사용량 확인
 3. 장치 연결(마운트)
    → mount 명령어로 파티션을 특정 디렉터리에 연결하여 사용할 수 있게 함
 	sudo mount <옵션> <장치명> <디렉토리명> -> 어떤 장치를 어느 디렉토리에 연결하겠다
-	$ mkdir mydata    #디스크를 연결할 디렉토리를 생성
-	# touch ./mydata/test1
+	$ mkdir /mnt/mydata    #디스크를 연결할 디렉토리를 생성 -> 주로 /mnt에 디렉토리 생성
+	# touch /mnt/mydata/test1
 	$ sudo mount /dev/sdb1 ./mydata	# 디스크와 디렉토리를 연결
 	# ls ./mydata 하면 test1 잠시사라지고 lost+found자동생성된것을 볼 수 있음
 	# touch ./mydata/test2
+	mount | tail -1 로 마운트 무엇이 됐는지 확인
 ------------------------------------------------------------------------------------------------------------------------
 4. 부팅 시 자동 마운트 설정 # 얘는 안해도 됨
    → /etc/fstab에 등록하여 재부팅 후에도 자동으로 마운트되도록 설정
@@ -125,3 +126,107 @@ df -h: 리눅스 시스템 "전체"에 디스크 사용량 확인
 	$ sudo umount /dev/sdb1    # 장치 제거
 	#ls ./mydata하면 test2사라지고 test1이 다시 돌아옴
 ------------------------------------------------------------------------------------------------------------------------
+
+curl : 터미널에서 HTTP 요청(파이썬의 requests와 유사)
+
+
+###########리눅스 계정관리###############
+처음 만든 사용자 계정은 보통 sudo 권한을 갖게 됨!!!!!
+
+계정정보는 /etc/passwd에 들어가 있음 -> vi /etc/passwd 로 눈에 잘보이게 확인가능
+	-> 사용자명 - x(비번) -uid(user identifier) -gid(groupid) - 설명 -홈디렉토리 위치 -로그인된 쉘 정보들 순차적으로 존재
+
+그룹 정보 관리: nano /etc/group 치면 그룹들 나오고 그 옆에 woohyun있으면 그 그룹에 들어가 있는거
+	-> vi /etc/group으로도 가능
+groups woohyun 으로 woohyun이 어느 그룹에 포함되어있는지 보여줌
+
+------------------------------------------------------------------------------------------------------------------------
+sudo adduser kkangwook  #새로운 유저
+	-> 해당 계정 비번 입력하라함 -> 1234 -> 1234재확인 -> 기본정보는 그냥 enter로 스킵
+	-> cat /etc/passwd하면 마지막에 새로운 kkangwook나옴
+	-> groups kkangwook하면 새로운 kkangwook이 어느 그룹에 속해있는지 보여줌
+
+sudo passwd kkangwook  # 새로운 비밀번호로 변경
+
+------------------------------------------------------------------------------------------------------------------------
+sudo userdel kkangwook   # 계정 삭제 -> 하지만 작업한 디렉토리는 남아있음
+		-r 옵션 사용시 홈디렉토까지도 삭제 
+sudo rm -r /home/kkangwook    # -r옵션 사용 안했으면 이걸로 삭제
+
+------------------------------------------------------------------------------------------------------------------------
+sudo groupadd [그룹명]			#그룹생성
+sudo gpasswd -a [사용자명] [그룹명]	# 사용자를 group에 add
+sudo gpasswd -d [사용자명] [그룹명]	#사용자를 group에서 del
+sudo groupdel [그룹명]			# 그룹제거
+
+------------------------------------------------------------------------------------------------------------------------
+su - kkangwook		# 유저 바꾸기
+	-> 얘는 sudo안됨 -> group kkangwook하면 sudo그룹에 포함이 안돼있음
+su : 는 유저는 바뀌지만 기존 환경 일부 유지 (디렉토리유지)
+su - : 는 유저도 바뀌고 기존환경도 바뀜(디렉토리도 사용자의 홈 디렉토리로 바뀜)  <-이게 권장!!!!!!!!!!!!!!!!!
+
+exit 	: 그냥 exit하면 로그아웃 -> 계속 exit하면 터미널 꺼짐
+
+------------------------------------------------------------------------------------------------------------------------
+chmod nnn file   #내가 소유한 파일이면 sudo 필요 X !!!!!!!!!!!!!!!!!!!!!!!
+
+sudo chown [새로운소유자명] [파일명]
+	sudo chown kkangwook file
+
+chown [소유자명]:[그룹명] [파일명] 	# 소유자와 그룹명 둘다 바꿈
+	chown kkangwook:kkangwook file
+
+chgrp [새로운 그룹명] [파일명]			#그룹만 바꾸기
+	chgrp kkangwook file
+------------------------------------------------------------------------------------------------------------------------
+
+apt = package manager
+apt <옵션> <명령><패키지이름>
+	옵션 -y 설치여부를물을때 yes를 자동 입력
+	update  최신 패키지 정보를 가져와 패키지 목록을 갱신 -> 이후 설치
+	install 설치
+	remove 설치된 패키지 제거
+	purge 설치된 패키지 및 설정파일 제거
+	autoremove 사용하지 않는 패키지를 모두 제거
+	clean 설치할 때 내려받기한 파일 제거
+
+apt -cache: 패키지를 설치하기 전 패키지에 대한 정보나 의존성을 확인 ->이 의존성이 맞아야 작동가능
+apt-cache <명령> <패키지이름>
+	show 패키지의 정보를 화면에 출력
+	depends 패키지에 대한 의존성 정보를 출력
+	rdepends 이 패키지에 의존하는 다른 패키지 목록 출력
+------------------------------------------------------------------------------------------------------------------------
+yum
+yum <옵션> <명령> <패키지이름>
+→ RHEL, CentOS, Rocky Linux 계열에서 사용하는 패키지 관리 명령어
+→ RPM(.rpm) 패키지를 설치/삭제/업데이트할 때 사용
+
+[주요 옵션]
+-y	→ 설치/삭제 과정에서 yes/no를 물어볼 때 자동으로 yes 선택
+
+[주요 명령어]
+1. 패키지 설치: yum install <패키지> ex) sudo yum install httpd
+2. 패키지 삭제: yum remove <패키지>	ex) sudo yum remove httpd
+3. 패키지 업데이트: yum update <패키지>	ex) sudo yum update httpd
+4. 전체 패키지 업데이트: sudo yum update
+5. 패키지 검색: yum search <키워드>	ex) yum search httpd
+6. 패키지 정보 확인: yum info <패키지>	ex) yum info httpd
+7. 설치된 패키지 목록 확인:	yum list installed
+8. 특정 패키지가 설치되어 있는지 확인:	yum list installed <패키지>	ex) yum list installed httpd
+
+------------------------------------------------------------------------------------------------------------------------
+systemctl: apache(웹서버 서비스)와 같은 서비스들 시작/중지/상태 확인
+	systemctl <명령> <서비스명>
+	$ systemctl list-units			#서비스들 출력
+	$ sudo systemctl status apache2	#서비스상태확인
+	$ sudo systemctl start apache2	#서비스 시작
+	$ sudo systemctl stop apache2	# 서비스 중지
+	$ sudo systemctl enable apache2	# 재부팅 후 자동으로 서비스 실행되도록
+	$ sudo systemctl disable apache2	# enable된 서비스 해제
+
+
+sudo apt install apache2 하고 firefox에서 localhost(나자신)들어가면 접속 뜸 -> ip addr 하면 inet이 ip주소
+	locathost에 보면 디렉토리 주소있음. 거기서 html을 sudo vi ~~~/~html해서 http작성하면 홈페이지 바뀜
+
+server: 서버 = 주는사람 (웹같은거 주기)  <=> 클라이언트:받는사람 ==브라우저
+
