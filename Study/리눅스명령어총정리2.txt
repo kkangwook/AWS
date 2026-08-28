@@ -371,3 +371,75 @@ sudo mount 192.168.1.37:/home/woohyun/share /mnt/share
 
 10: 서버의 ~/share와 클라이언트의 /mnt/share가 같은 파일을 보여주게 됨
 	-> 각각 cat으로 파일 생성하면 동시에 생성
+
+
+
+------------------------------------------------
+명령어 & 으로 백그라운드 여러개 실행후 fg로 마지막 백그라운드를 포어그라운드로 되돌림
+	-> 원하는거 포어그라운드로 돌리기 -> jobs로 번호찾고 fg%번호 하면 해당 백그라운드를 포어그라운드로
+
+du(이 폴더가 얼마나 먹고있지?) vs df(이 디스크 전체에 얼마나 남았지?)
+
+보안 3요소 기밀성 무결성 가용성
+
+rsyslog.conf는 syslog에 권한이 있어야 작성가능
+
+syslog는 텍스트파일, journallog는 바이너리 파일
+
+Web = 요청 받기·정적 콘텐츠 제공
+Application = 요청에 따라 실제 기능/로직 실행
+
+이번 실습은 애플리케이션쓰기에는 너무 복잡해서 이를 대체하고자 PHP를 웹서버에 붙임. 그리고 이 PHP가 데이터베이스와 연결됨
+
+/var/www: 보통 웹 서버가 웹사이트 파일을 저장하는 디렉터리
+
+php-mysql 설치해서 둘이 연동되게
+
+우리는 개발자가 아니라서 워드프레스라는 오픈소스 웹 콘텐츠 관리 시스템 사용
+
+wget : 웹에 있는 컨텐츠를 내 컴터에 다운받기 가능
+
+mv -r 로 wordpress를 /var/www/html 안으로 옮겨야함
+
+
+================3티어 구축=================
+1. 웹서버 패키지 준비
+	sudo apt -y install apache2
+
+2. 동적 웹 스크립트(PHP) 패키지 설치
+	sudo apt -y install php
+	php -v로 확인
+
+3. /var/www/html에 info.php파일 생성
+	sudo vi /var/www/html/info.php
+		->밑에걸 적음 
+		<?php				#PHP 코드라는 표시
+			phpinfo();			#현재 서버의 PHP 버전, 설정, 모듈 등의 정보를 웹페이지로 출력
+		?>       
+
+4. mysql설치
+	sudo apt -y install mysql-server	#mysql설치
+	sudo apt -y install php-mysql	#php-mysql연동을 위한 패키지도 설치
+	sudo systemctl start mysql		# mysql 서비스 시작
+
+5. 워드프레스라는 오픈소스 웹 콘텐츠 관리 시스템 사용(우리는 개발자가 아니라 만들어진거 사용)
+	wget https://wordpress.org/latest.tar.gz   # wget으로 워드프레스 압축파일 다운받아오기
+	tar -xzf latest.tar.gz				# 받아온 파일 압축해제 및 풀기 -> wordpress 디렉토리가 생성됨
+	sudo cp -r wordpress /var/www/html/	# /var/www/html에 이 wordpress파일 옮김 -> Apache가 웹으로 제공하는 /var/www/html/ 아래로 복사
+	sudo chown -R www-data:www-data /var/www/html/wordpress  # 소유자,그룹 www-data로 변경 (아파치가 사용하는 소유자와 그룹)
+	sudo chmod -R 755 /var/www/html/wordpress				# 권한도 변경
+
+6. mysql 실행 및 프로프트 작성(wordpress에 쓰일 DB)
+	sudo mysql -u root -p		# sql입력창 열림
+
+CREATE DATABASE wordpress;			-> var/lib/mysql/wordpress로 저장됨
+CREATE USER 'admin' IDENTIFIED BY '1234';
+GRANT ALL PRIVILEGES ON wordpress.* TO 'admin';
+FLUSH PRIVILEGES;
+EXIT;
+
+7. 워드프레스 설치 마법사  -> 여기서 워드프레스랑 DB 연동됨
+	http://IP주소/wordpress로 이동
+	-> 언어 설정하고 db이름, 사용자명, 비번 입력 (이 정보들 적으면 알아서 연동해줌)
+	->만들 페이지이름,사용자,비번,이메일등입력
+	-> 페이지 생성 !!!!!!!
