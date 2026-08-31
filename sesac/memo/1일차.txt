@@ -1,0 +1,152 @@
+하이퍼바이저(Hypervisor): 가상머신(Virtual Machine, VM)을 생성하고구독하는소프트웨어
+	즉: n개의 하드웨어위해 n개보다 더 많은 VM을 만들기 위한 기술
+	타입1: OS없음
+	타입2: OS있음 -> 우리가 평소에 쓴거(VMware, VirtualBox)
+
+클라우드는 실제로 매우 안전하다!!!!
+
+네트워크, 서버도 인프라에 포함
+
+30. 물리계층 - 방화벽  - security group - hypervisor - customer
+
+aws 서울 리선: ap-northeast 2
+ap_northeast-2a
+ap_northeast-2b
+ap_northeast-2c
+ap_northeast-2d
+
+IAM: Identity and Access Management   매우중요!!!!!!!!!!!!!
+	: 계정 관리 보안의 대표적인 서비스/개념
+	-> 잘 관리위해 관리자 계정을 쓰지 않는다!	
+	-> 관리자 계정은 다른 계정 관리할때만 씀
+	MFA를 필수적으로 연동해서 안전하게 관리해야함
+
+VPC는 네트워크를 관리
+
+SG(Security Group), EC2는 서버를 보안
+
+nginx는 서비스를 보안
+
+route53, ELB, autoscaling으로 가용성 관리
+
+정보보안의 3요소 CIA   기무가
+	C: Confidentiality 기밀성
+	I: Intergrity 무결성
+	A: Availability 가용성
+
+CSP(clound service provider): 클라우드 서비스 제공자 ex) AWS, AZure
+MSP(managerd service provider): 관리해주는 대행사 ex) bespin global
+	: AWS 재판매/관리해주는 re-seller
+
+IAM 모범사례
+1. Users – 개별사용자를통한권한관리
+2. Password – 가장높은수준의암호정책부여
+3. Rotate – 보안키를자주갱신
+4. MFA – OTP 및 모바일앱 등 멀티펙터인증사용(루트사용자는반드시)
+5. Groups – 그룹을통한권한관리
+6. Permissions – 처음에는무조건최소한의권한만
+7. Sharing – 권한공유는IAM 역할(Roles)을 통해
+8. Roles – EC2 인스턴스에도부여(사람뿐만아니라서버에도할당)
+9. Root – 접속금지(또는삭제)
+10. Auditing & Monitoring – 감사및 확인
+
+MFA(Multi-factor Authentication) : 비번 + OTP + 지문   이런식으로 여러 다른 인증요소 factor로 인증하는법
+
+SG는 인스턴스 수준에서 적용/ NACL은 서브넷 기준에서 적용
+
+
+########################################실습############################################
+
+lightsail: 쉽게 사용할수있는 서버
+
+1. 윈도우 lightsail 실행방법 -> lightsail 서치 및 클릭 -> create instance -> 마소윈도우 클릭 -> 밑으로 -> 가장 싼 사이즈 선택 -> 이름 지정 -> create instance -> connecting using rdp하면 새로운 창뜨면서 마치 새로운 컴퓨터 -> delete하면 삭제(복호화 불가능)
+
+2-1. 리눅스 lightsail만들기: linux apps(서버) + blueprint로 wordpress(웹사이트 만드는 도구) -> 7달러 -> 이름짓기 -> connect using SSH (우리가 편하게 접속하라고 웹기반의 SSH서비스를 AWS가 대신 구현해둔것) -> apache2자동으로 있음, wordpress도 있음 -> public ipv4 address그대로 크롬에 입력해서 무시하고 고급들어가서 보면 웹페이지 뜸
+
+2-2. 간단말고 정상적인 접속경로 보기: 그냥 ssh로 접속 (43.200.255.34)
+	미리 방화벽해제(lightsail페이지에서 networking클릭 -> firewall rules 에서 ssh수정 -> source ip address에서 custom을 anywhere IPv4로 바꿔줌 -> update rule)
+	-> 윈도우의 시작-> cmd -> ssh ip주소 엔터하고 yes-> ssh그래도 실행안됨 (ssh 43.200.255.34 ) -> 나의 서버의 id, pw가 필요함(이때 보안적으로 별로여서 리눅스의 key로 사용)
+	-> lightsail의 connetct가서 username: admin, ssh키는 다운로드
+	-> ssh 43.200.255.34 -l admin -i C:\Users\SBA\Downloads\LightsailDefaultKey-ap-northeast-2.pem (키파일- cd안했으면 full path입력해야함) (코덱스 깔려있으면 에러남)
+	
+워드프레스 관리자페이지 : https://43.200.255.34/wp-admin   -> id/pw입력해야함 -> 리눅스 cmd에 ls-l하면 application_credentials파일이 있음
+	-> cat application_credential하면 user, Ll3YVFoLJjLJiq5t가 나옴 -> 그대로 id/pw로 입력 => quick draft로 안에 내용 적어서 웹사이트처럼
+
+3. 문제: nginx웹서버 welcome to nginx를 welcome to woohyun으로 바꾸기
+linux + nginx(웹서버) + 5달러		3.35.140.201  (public ip)
+	-> ssh 3.35.140.201   (얘는 방화벽필요 X, id, key는 필요)
+	-> ssh 3.35.140.201 -l admin -i C:\Users\SBA\Downloads\LightsailDefaultKey-ap-northeast-2-2.pem
+	-> systemctl status nginx
+	-> find / -name *html -> index.html파일 나옴 -> sudo vi ~.index.html나옴 -> 여기서 고쳐주면 됨
+	또한 cat /etc/nginx/nginx.conf하면 안에 주요 설정(configuration)들 나옴
+
+/etc: 안에 모든 설정파일이 온다
+/proc: 스페셜 파일시스템으로 다양한 프로세스 상태들
+ /var: 각종 변경되는 내용이 온다
+ /var/log: 대표적으로 바라봐야할 디렉토리
+
+sudo lastb : 로그인에 실패한 기록   (이때 last가 성공한 기록)
+	sudo lastb | wc -l : 로그인 실패 횟수
+	sudo lastb | awk '{print $3}' | sort -u : 고유 ip만 보기
+	sudo lastb | awk '{print $3}' | sort -u | wc -l : 고유 ip개수
+
+cat /var/log/nginx/access.log
+tail -F /var/log/nginx/access.log		#실시간으로 nginx페이지에 무슨일 있었는지 확인
+
+####################################################################################
+
+404error:왜 404인가 -> RFC(request for comment)표준, IEEE표준으로 정해놔서
+숙제: 집에가거든 우리지의 wifi는 무엇인가?(스펙알아보기)
+
+
+HTTP 프로토콜 정의 : 웹에서 클라이언트와 서버가 데이터를 주고받기 위한 통신 규칙
+
+100 Informational (정보)
+100 Continue              → 요청을 계속 진행해도 됨
+
+200 Success (성공)
+200 OK                    → 요청 성공
+201 Created               → 요청 성공 + 새로운 리소스 생성됨
+202 Accepted              → 요청은 접수됐지만 아직 처리 완료되지 않음
+
+300 Redirection (리다이렉션)
+300 Multiple Choices      → 여러 응답/선택지가 존재
+301 Moved Permanently     → 영구적으로 다른 주소로 이동
+302 Found                 → 임시로 다른 주소로 이동
+303 See Other             → 다른 주소로 가서 결과를 확인
+304 Not Modified          → 변경된 내용 없음 (캐시 사용 가능)
+
+400 Client Error (클라이언트 오류)
+400 Bad Request           → 잘못된 요청
+401 Unauthorized          → 인증 필요
+403 Forbidden             → 접근 권한 없음
+404 Not Found             → 요청한 페이지/리소스 없음
+
+500 Server Error (서버 오류)
+500 Internal Server Error → 서버 내부 오류
+501 Not Implemented       → 서버가 해당 기능을 지원하지 않음
+502 Bad Gateway           → 게이트웨이/프록시가 잘못된 응답을 받음
+503 Service Unavailable   → 서버가 일시적으로 요청 처리 불가능
+504 Gateway Timeout       → 게이트웨이/프록시 응답 시간 초과)
+
+====================================
+요즘은 윈도우에 ssh있어서 그냥 cmd에서 하면됨
+but 그 이전에는 putty, mobaxterm씀
+
+========================
+ec2인스턴스 고르기
+t2.nano(5천원) ~ t2.medium(4만원) ~ t2.2xlarge(32만원)  : 각 단위마다 2배씩 가격 증가
+
+요즘은 t3 cpu씀 -> 이때 t3가 인텔, t3a가 amd인데 amd가 가격/성능 더 좋음
+
+===============================
+우분투: 공짜
+레드햇: 유료 -> 회사에서 많이씀 -> 문제생기면 as가능
+
+##########################################
+EC2 만들기
+	리전고르기(서울) -> 인스턴스시작 클릭 -> 이름 -> AMI(누가 정해놓은 EC2 이미지 템플릿) -> ubuntu(우분투 AMI맨 위에거 26.04그대로)
+	-> 유형고르기(t2.micro 무료) -> 새 키 페어 생성(이름->RSA(아직한국은ED25519안씀)-> .pem) 및 파일 다운 -> 네트워크설정에서 새 VPC생성
+	-> vpc설정 -> 서브넷 설정(CIDR: 172.31.0.0/20 껄로) ->퍼블릭ip 자동 할당 활성화 -> 보안그룹생성 -> 보안그룹이름 -> 설명 -> 스토리지 디스크 크기 8gb -> 끝까지 쭉 -> 옆에 인스턴스개수 1개 -> 인스턴스 시작
+	-> 인스턴스 들어가면 생성된 인스턴스 있음 -> ip주소: 3.34.28.183, 사용자이름: ubuntu
+	-> cmd에서 ssh 13.124.237.25 -l ubuntu -i C:\Users\SBA\Downloads\woohyun-web-key.pem
