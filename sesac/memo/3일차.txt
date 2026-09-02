@@ -1,3 +1,38 @@
+- 웹 접속 오류 확인 순서
+  1. sudo tcpdump -i enX0 -nn port 80
+     → 80번 패킷이 서버까지 들어오는지 확인
+     → 아무것도 안 뜸 : 서버까지 패킷이 안 옴(IP, 보안 그룹, 방화벽 확인)
+     → Flags [S] : 클라이언트가 연결을 요청함
+     → Flags [S.] : 서버가 연결 요청을 수락함
+     → Flags [.] : 연결 확인
+     → Flags [P.] : 실제 데이터를 전송함
+     → Flags [F.] : 정상적으로 연결을 종료함
+     → Flags [R.] : 서버가 연결을 거부함(해당 포트의 서비스가 꺼져 있을 가능성)
+
+  2. sudo netstat -antp
+     → 현재 서버의 TCP 연결 상태와 열려 있는 포트를 확인
+     → Local Address : 내 서버의 IP와 포트
+     → Foreign Address : 상대방의 IP와 포트
+     → LISTEN : 해당 포트가 열려 있고 접속을 기다리는 상태
+     → ESTABLISHED : 상대방과 연결된 상태
+     → PID/Program name : 해당 포트를 사용하는 프로세스
+     → 0.0.0.0:80 ... LISTEN : 모든 IP에서 들어오는 80번 요청을 받을 준비가 됨
+     → 80번 포트가 없음 : 웹 서비스가 실행되지 않거나 다른 포트를 사용 중
+
+  3. 패킷은 들어오지만 Flags [R.]이고 netstat에 80번이 없는 경우
+     → sudo systemctl status nginx
+     → Nginx가 꺼져 있으면 sudo systemctl start nginx
+     → sudo netstat -antp에서 0.0.0.0:80 ... LISTEN이 나오면 정상
+
+- 핵심
+  → tcpdump : 패킷이 서버까지 도착하는지 확인
+  → netstat -antp : 서버가 해당 포트를 열고 기다리는지 확인
+  → tcpdump에 아무것도 안 뜸 : 서버 바깥쪽 문제
+  → tcpdump에 [R.]이 뜨고 netstat에 포트가 없음 : 서버 서비스 문제
+  → tcpdump에 [S], [S.], [.]이 뜨고 netstat에 LISTEN이 있음 : 네트워크 연결은 정상
+--------------------------------------------------------------------------------------------------
+
+
 Nat은 외부에서 내부는 안되지만
 내부에서 외부로 보내고 받은걸 다시 내부로 들어오게 할 수 있음 (NAT이 공인ip변환해서 나갈때 정보를 기억해서 받을때 참고함)
 
