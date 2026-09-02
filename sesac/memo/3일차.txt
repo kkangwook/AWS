@@ -175,7 +175,7 @@ client꺼로 $ while True; do curl 172.31.12.35;done;   #woohyun꺼
 
 
 vscode에서 remote ssh설치
-원격 탐색기 -> ssh ubuntu@43.203.220.76 치고 ~/config누르고 설정파일안에 마지막줄에 IdentityFile C:\Users\SBA\Downloads\woohyun-web-key.pem넣음
+원격 탐색기 -> ssh ubuntu@43.203.220.76 치고 ~/config누르고 ssh톱니바퀴누르고 맨위 .ssh/config누르면 -> 설정파일안에 마지막줄에 IdentityFile C:\Users\SBA\Downloads\woohyun-web-key.pem넣음
 	-> 43.203.220.76칸 누르고 새창에서 열기 ->리눅스선택-> 터미널 열기 -> ssh로 연결되어있음
 
 while True; do curl 43.203.220.76;done; &
@@ -198,16 +198,16 @@ pip install flask
 python 2.flask.py
 
 ############플라스크 코드################
-"from flask import Flask
+from flask import Flask
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return ""<H1>Helo, Flask</H1>""
+    return "<H1>Hello, Flask</H1>"
 
-if __name__ == ""__main__"":
-    app.run(host=""0.0.0.0"")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")
 "
 #######################################
 
