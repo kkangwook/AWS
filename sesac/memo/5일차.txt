@@ -1,0 +1,207 @@
+인트라넷: 회사직원용 private subnet
+
+프로젝트 당 하나의 계정이 좋음
+계정 하나만 쓸거면 태그 잘 정해놓는게 좋음
+
+사용않하는 키 지우기: EC2창에서 왼쪽에 네트워크 및 보안 -> 키페어 클릭 -> 키들 클릭하고 작업 -삭제하면 됨
+
+
+-------------------------------------------------------------------------
+1. VPC생성(10.0.0.0/16)
+
+2. 서브넷 생성(4개) + 각 서브넷 자동ip부여 활성화
+
+pub-subnet-1   	<-2a
+10.0.10.0/24
+
+pub-subnet-2	<-2b
+10.0.20.0/24
+
+pri-subnet-3	<-2a
+10.0.30.0/24
+
+pri-subnet-4	<-2b
+10.0.40.0/24
+
+3. internet gateway생성
+	-> 회선을 vpc에 연결
+
+4. 라우터 자동으로 생성되고 이후 vpc에 연결(서브넷끼리도 연결됨)
+	-> 이때 명시적으로 서브넷 연결을 안하면 모든 서브넷이 다 자동으로 연결됨
+	-> 이후 IGW까지도 연결(편집으로 0.0.0.0/0, 인터넷 게이트웨이, 만든 vpc-igw)
+
+5. 미리 SG만들고(인바운드만 ssh추가) 각 서브넷에 서버(EC2)생성
+pub-1, pub-2, pri-3까지만 만들기
+
+woohyun-pub-web-1	3.38.151.208	10.0.10.130
+woohyun-pub-web-2	3.35.5.180		10.0.20.82
+woohyun-pri-web-3	3.39.225.36		10.0.30.18
+
+--------------------------------------------------망 분리하기 실습----------------------------------------------------------------------
+현재 서브넷 전부 퍼블릭으로 접속중
+
+인터넷이 가능한 망(network)
+	|
+새로운 라우터로 분리(이때 EC2 서버끼리는 연결가능)
+	|
+인터넷이 "불"가능한 망(network)
+
+vpc -> routing table추가 -> sesac-vpc-private-router라는 새로운 라우터 VPC적용시켜서 생성 -> 두 router 같은 vpc에 연결됨
+-> public router클릭 -> 작업 -> 서브넷 연결 편집-> pub서브넷에만 연결 -> private꺼는 pri subnet에만 연결
+-> pri 창 이제 작동 안됨, public ip로 연결 안됨 -> 하지만 pri3은 pub1, pub2랑 연결이 되어있음
+-> pub1에서 ssh ubuntu@3.39.225.36는 안됨 -> ssh ubuntu@10.0.30.18 -> 되긴하는데 키가 없어서
+-> cmd로 우리 윈도우에서 pri1에 키 복사해줘야함 
+-> scp -i C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem ubuntu@3.38.151.208:~/woohyun-sesac-vpc-key.pem
+-> 그리고 pri1에서 pub3접속해도 위험하다며 안됨
+-> chmod 400 woohyun-sesac-vpc-key.pem   # 이거 사용자한테만 읽을수 있도록 돼있어야함
+-> ssh ubuntu@10.0.30.18 -i woohyun-sesac-vpc-key.pem 으로 pub1에서 pri3에 프라이빗하게 접속함
+-> 하지만 키를 내부에 복사에서 두면 안됨!!!!!
+-> ssh-agent를 통해서 키를 전달해야함 !!!!!
+-> powershell를 관리자로 실행 -> Get-Service ssh-agent | Set-Service -StartupType Manual  # 설정변경
+-> Start-Service ssh-agent  로 실행
+-> cmd에서 ssh-add C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem 로 추가
+-> ssh-add -l 하면 추가된 키 목록들 볼 수 있음
+-> 삭제하고 싶으면 ssh-add -d C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+-> cmd에서 pub1로 agent를 통해 키 지정 없이 이제 접속가능해짐
+-> ssh ubuntu@3.38.151.208 -A 하면 agent없이 접속가능해짐 (or ssh -A ubuntu@3.38.151.208)
+-> ssh ubuntu@10.0.30.18 로 키 없이 바로 private접속 가능 (Agent가 반드시 붙어있어야함!!!!!!)
+
+MobaXterm에서 더 쉽게 가능 ->바로 사설ip로 접속 가능 by SSH gateway
+1. -> session -> SSH -> host와 유저에 pub3꺼 입력, advanced ssh세팅에 키 넣어주고
+-> network setting들어가서 SSH gateway 클릭!!!!!!!!!!
+-> gateway host와 이름으로 pri1 입력, port22유지(SSH), 키도 집어넣음 -> ok -> ok하면 사설ip바로 접속!!!!!!!!!!!!
+
+2. or agent처럼 쓰는 기능 있음
+settings -> SSH -> SSH agents에 use internal SSH agent MobAgent 클릭
+-> show keys클릭 -> add key ->ok  (이때 mobaxterm끄면 사라져있어서 추가해줘야함)
+-> pri3 키 없이 접속가능
+
+이때 pub1->pri2들어로때 -A로 ssh해야 또 다른데를 키 없이 돌아갈 수 있는거임!!!!!
+
+
+---------------------------------------------------------------------
+pub1에 nginx 설치 -> SG http허용
+->pub2에도 nginx 설치 -> 여기는 sg지정 필요 X -> 다 같은 SG니까
+-> pri3 -A로 접속해서 nginx설치하려했지만 안됨 -> 인터넷 게이트웨이 연결 안되어있어서
+-> 그래서 원래라면 다운받아서 pri3으로 복붙해야함
+-> BUT NAT gateway로 해결하면 됨(내부에서 외부로는 가능/ 외부에서 먼저 접근은 불가!!!)!!!!!!
+즉 public: 내가 나가고 남이 들어올수있음   vs    private: 내가 나갈수있지만(by NAT gateway) 남(외부망)이 들어올수는 없다 (내부망 제외) 
+-> AWS의 VPC -> 왼쪽에 NAT gateway있음 -> 생성 -> 이름 sesac-vpc-natgw -> 영역별 클릭 
+-> 이때 NAT을 pri3이 있는 서브넷에 넣으면 안됌!!!!!!!!!!!!!!!!!!! -> 짜피 연결 안돼있어서
+@-> NAT은 pub1이나 pub2가 속한 서브넷에 넣는다!!!!!!!!!!!!!!!!!!!!!!!
+-> 그래야 pri3이 pub1 ec2에 연결되고 여기서 NAT타고 밖으로 나간다!!!
+-> 퍼블릭 -> 탄력적ip할당 (나갈때 공인ip받기 위해) -> 생성
+-> 프라이빗 라우팅 테이블 -> 라우팅 편집 -> 라우팅 추가 -> 0.0.0.0/0(모르는 ip가 왔을때 전부)를 NAT 게이트웨이로 보내라+ natgw -> 변경사항저장
+-> 즉 pri3이 이동할때 경로몰라서 private router로 이동 -> 그러면public router로 이동 -> 그래도 몰라서 NAT gateway가 받음 -> 얘가 밖으로 내보냄
+-> nginx다운 -> 하지만 ip로 접속해도 아무것도 안뜸
+-> 왜냐!!! : 외부로 나가 다운받아올 수 있지만 외부에서 내부로 들어오는거는 당연하므로!!!!!
+-> 따라서 private 서브넷은 공인ip가 필요없다!!!!!!!!!!!!!!!!!!!!
+-> 그래서 private서브넷 들어가서 각각 사설ip 자동 활성화 끄기
+-> 그러면 SG는? -> public과 private 따로 관리
+-> SG 생성 ->이름 sesac-vpc-was-sg -> 기존 VPC설정 -> 인바운드 규칙: SSH, 사용자지정으로 10.0.0.0/16으로 내 같은 VPC의 EC2에서만 들어오겠다고 지정!!!!!
+-> 또 규칙추가해서 flask허용위해 5000포트, 10.0.10.0/24 허가 -> 즉 pub-subnet-1에서만 flask 접속가능하게 -> 생성
+-> pri3의 보안그룹 변경 -> 기존 보안그룹 제거 -> 새로운 보안그룹추가 
+
+-> woohyun-pri-was-4 EC2만들어보기
+-> 근데 만약 pub1이 속한 az가 불이나면 pri4는 작동하지만 NAT gateway가 동작안하므로 pri4의 외부 접속 불가!!!
+
+#########
+최근나온 NAT 게이트웨이 생성할때 리전(신규로 하면 서브넷 지정 안해줘도 되!!!!!!!!!!!!!!!!)
+
+
+------------------------------------scale out하고 flask web/was하기------------------------------------------
+중지하고
+web1 = t3a.small
+web2 = t3.small
+was3 = t3a.medium
+was4 = t3.medium
+로바꾸기
+
+-> 시작하면 ip바껴있음
+
+vscode접속, config수정 (identity file은 agent했기 땜에 없어도 되는데 그냥 안전하게 넣어둠)
+-> 이떄 ProxyJump라고 사설로 접근하는 방법있음
+Host web1_54.180.126.208
+  HostName 54.180.126.208
+  User ubuntu
+  IdentityFile C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+
+Host web2_3.38.204.26
+  HostName 3.38.204.26
+  User ubuntu
+  IdentityFile C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+
+Host was3_10.0.30.18
+  HostName 10.0.30.18
+  User ubuntu
+  IdentityFile C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+  ProxyJump web1_54.180.126.208
+
+Host was410.0.40.54
+  HostName 10.0.40.54
+  User ubuntu
+  IdentityFile C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+  ProxyJump web1_54.180.126.208
+
+was3에 flask설치
+sudo apt install python3-venv
+sudo apt install python3-pip
+
+python3 -mvenv ~/.venv/flask
+source ~/.venv/flask/bin/activate
+pip install flask
+
+코드적고
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "<H1>Helo, Flask</H1>"
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")
+python app.py실행하고 다른 터미널에서 curl localhost:5000하면 뜸
+
+
+
+web1에서
+sudo /etc/nginx/sites-available/default
+-> location밑에 
+location /was {
+	proxy_pass http://10.0.30.18:5000/;      #-> web1 ip/was하면 http://10.0.30.18:5000여기로 보내겠다
+}
+넣고 저장
+sudo systemctl restart nginx로 재시작
+
+-> web1 ip들어가면 http://54.180.126.208/was  # 여기서 /was하면 사이트 떠있음
+
+was3에서 flask를 실행했는데 왜 web에서는 nginx를 고친이유:
+	was3에서는 Flask 앱을 실행해서 실제 웹 서비스를 제공하고,
+	web1에서는 Nginx가 /was 요청을 받아 was3의 Flask(10.0.30.18:5000)로 전달하도록 설정
+
+
+
+======================================6개 만들기 =================================
+az-1    az-3
+web1, web2 = pub
+
+natgw <-- 신규 (multi-az)
+
+was1, was2 = pri
+db1, db2 = pri
+
+
+VPC: sesac-3tier-vpc 10.0.0.0/16
+
+sesac-pub1	az-1	10.0.10.0/24 nginx
+sesac-pub2	az-3	10.0.20.0/24
+
+sesac-pri3	az-1	10.0.30.0/24	 python
+sesac-pri4	az-3   10.0.40.0/24
+
+sesac-pri5 	az-1   10.0.50.0/24  mysql
+sesac-pri6	az-3	 10.0.60.0/24
+
+db5에서 
