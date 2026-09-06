@@ -1,0 +1,266 @@
+############################# 주요코드 #############################
+- 서비스 상태보거나 시작/종료/설정변경후재시작 하는 명령어:			sudo systemctl status/start/stop/restart nginx
+
+- 로그인 실패기록 확인하기+여러옵션:						sudo lastb    -> 
+									sudo lastb | awk '{print $3}' | sort -u | wc -l : 고유 ip개수
+
+-이전 로테이션된 로그인 실패기록 보는법:					sudo lastb -f /var/log/btmp.1  #file
+- 이전 nginx에 들어온 http요청 보는법:					cat /var/log/nginx/access.log.1
+
+- 서비스(ssh등) 로그(로그인) 실패보기 						sudo journalctl -u ssh | grep -E "Failed password|Invalid user" | wc -l   #unit
+
+- cmd에서 내 컴퓨터가 알고있는(캐시) ip보기					arp -a
+
+- 서버의 상태를 알수있게한 프로토콜 + 명령어					ICMP / ping
+
+- 다른 서버한테 요청을 보내고, 서버가 보내준 응답을 터미널에서 확인하는 명령어	curl localhost
+
+- 네트워크 인터페이스 지나가는 패깃 관찰 명령어				sudo tcpdump -i enp0s3 -nn port n(번호)  #interface
+
+- 라우트 테이블 보는법							route -n
+
+- 라우트 테이블에 경로 추가하는 명령어 					sudo route add -net 10.20.20.0/24(범위) gw 10.10.10.2(일단 우선 가야하는곳)
+
+- 현재 서버의 TCP 연결 상태와 열려 있는 포트를 확인				sudo netstat -antp
+
+- cpu, mem상태 동시에 보기							htop
+
+- 디스크 용량보기								sudo du
+
+- 물리, 논리 디스크들 목록 보기						sudo fdisk -l
+
+- 디스크 사용량 보기							df -h
+
+- 내 ip 보기								ifconfig, ip addr
+
+- xvdf 포매팅하기								sudo mkfs -t ext4 /dev/xvdf
+- /data에 xvdf 마운팅하기							sudo mount /dev/xvdf /data
+- xvdf 용량 늘려서 쓸수있게 하기						sudo resize2fs /dev/xvdf
+- C드라이브(xvda) 늘렸을때 먼저해야하는것					sudo growpart /dev/xvda 1
+
+- mysql DB서버에 접속하는법 						mysql -h DB서버IP -u 계정명 -p
+
+- EC2 서버로 파일 보내는 코드						scp ⬛ -i ⬛ key ⬛ file ⬛ ubuntu@ip:place
+
+- ssh-agent실행하고 키도 넣는법 						Start-Service ssh-agent -> ssh-add key
+
+- 사설 ip 3가지는?								10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+############################# 위치 #############################
+- 워드프레스 id/pw있는곳					home의 application_credential에 있어서 안에서 보고 http:ip/wp-admin 하고 id/pw입력하면됨
+
+- nginx html파일 있는곳					/var/www/html
+- nginx log파일 있는곳					/var/log/nginx/access.log
+				
+
+- 로그 파일 주기적 정리 설정 파일위치				/etc/logrotate.conf
+
+- EBS장치 위치해 있는곳 					/dev/xvdf
+
+-자동 마운트 해주는 위치					/etc/fstab
+
+
+############################# 개념 #############################
+- SG는 인스턴스 수준에서 적용/ NACL은 서브넷 기준에서 적용
+	SG는 인바운드만 건든다(아웃바운드 냅둠) 
+- MFA(Multi-factor Authentication) : 비번 + OTP + 지문   이런식으로 여러 다른 인증요소 factor로 인증하는법
+- LAN(2계층)은 MAC주소(기기들고유번호)를 참고해서 스위치가 연결 (이더넷 프로토콜 사용)
+- WAN(3계층)은 라우팅테이블+라우터로 LAN에 ip부여해 전송되게(이때 한 라우터는 펼쳐나갈 수 있는 방향이 2~3개 존재)
+- DHCP가 네트워크 장치(기기)에 IP 주소와 설정 정보를 자동으로 할당
+- NAT가 사설ip나갈떄 공인ip로 바꿔줌+해당기기의 포트설정 -> 다시 들어올때 인지해서 받아들이고 포트번호로 해당 고유 기기로 돌아오게함
+	외부에서 내부는 안됨 
+- VM의 네트워크 종류
+	NAT: 서로 같은 사설 ip가져도 괜찮으며 사설ip를 공인으로 전환해 인터넷으로 나가게해줌
+	Bridged Adapter: VM을 직접 LAN에 연결
+	Host-only: windows Host와 VM끼리의 통신을 위한 LAN
+	Internal Network(Intnet): VM끼리만 통신
+	NAT Network: VM끼리 통신 + 인터넷 통신 가능
+- IP Forwarding: 한 네트워크 인터페이스에서 받은 IP 패킷을 다른 네트워크 인터페이스로 전달하는 라우터의 핵심기능
+- sudo tcpdump -i 랜카드 -nn port n 하면 출발지 IP -> 목적지 IP나오고
+	- 패킷자체가 안보임: 서버까지 요청이 못 옴(IP문제/SG/라우팅/NACL 등 확인)
+	- 패킷은 보이는데 응답이 없음: 서버의 서비스상태/netstat으로 포트확인 /ufw방화벽 등을 확인
+- route -n 에서 0.0.0.0은 테이블에 길 없으면 디폴트로 보낼곳을 의미
+- 같은 VPC에 있으면 사설ip로 서로 접속 가능
+- netstat -antp 해서 ip범위와 : 포트  부분이 listen 되어있어야 해당 서비스 접속 가능
+
+
+############################# 실습 #############################
+--------------------------------1. 1일차: ssh 접속		ssh ubuntu@ip -i key
+
+
+--------------------------------2. 2일차: 네트워크 다른 VM 연결하기
+
+VM1 어댑터들 : NAT, Host-Only(192.168.~), Intnet1(10.10.10.1/24)
+VM2 어댑터들 : NAT, Host-Only(192.168.~), Intnet1(10.10.10.2/24), Intnet2(10.20.20.2/24)
+VM3 어댑터들 : NAT, Host-Only(192.168.~), 		           Intnet2(10.20.20.3/24)
+
+NAT은 필수로 있어야하고 각 cmd에서 Host-Only로 ssh연결, 각 VM들은 Intnet으로 통신
+-> 이때 VM1, VM3끼리는 네트워크 달라서 서로 ping 안됨(라우터 필요)
+-> VM1 터미널에서 sudo route add -net 10.20.20.0/24 gw 10.10.10.2
+	: 10.20.20.0/24 범위로 가고싶으면 일단 10.10.10.2로 가라고 라우트테이블 설정
+-> VM2에서는 sudo sysctl -w net.ipv4.ip_forward=1
+	: ip forward기능 활성화해서 자기 목적지가 아닌 IP 패킷을 다른 인터페이스로 전달해서 라우터처럼 동작하게 함
+-> VM3 터미널에서는 sudo route add -net 10.10.10.0/24 gw 10.20.20.2
+	: 받은 신호 다시 돌려보내야 하므로 반환 경로 설정
+=> 최종적으로 VM1, VM3 ping 가능해짐
+
+
+
+---------------------------------3. 3일차: 디바이스 연결하기
+AWS에서 같은 가용영역으로해서 EBS생성하고 이 EBS를 작업으로 들어가 인스턴스에 연결 + 이름 정하기
+1. 연결:  sudo fdisk -l로 확인 -> sudo mkfs -t ext4 /dev/xvdf 로 포맷팅 -> sudo mount /dev/xvdf /data #/data디렉토리에 연결 -> df -h로 확인
+2: 용량 늘리기: 기존 EBS 작업눌러서 볼륨수정 -> sudo resize2fs /dev/xvdf 하면 쓸수있는 영역 늘어나 있음
+3. 자동 마운트 되게 하기: sudo vi /etc/fstab -> 맨 밑줄에 /dev/xvdf	/data	ext4	defaults	0 1 적어줌
+	or sudo blkid해서 나오는 UUID값을 UUID="~"형태로 /dev/xvdf	/data대신 집어넣음
+4. 원래의 C드라이브 늘리기: C드라이브 볼륨수정 -> sudo growpart /dev/xvda 1 로 파티션 늘리기 -> sudo resize2fs /dev/xvda1 로 그제서야 리사이징
+
+
+
+-------------------------------4. 여러 어플리케이션을 통해 AWS 연결 
+1. vscode에서 remote ssh설치
+원격 탐색기 -> ssh ubuntu@43.203.220.76 치고 ~/config누르고 ssh톱니바퀴누르고 맨위 .ssh/config누르면 -> 설정파일안에 마지막줄에 IdentityFile C:\Users\SBA\Downloads\woohyun-web-key.pem넣음
+	-> 43.203.220.76칸 누르고 새창에서 열기 ->리눅스선택-> 터미널 열기 -> ssh로 연결되어있음 -> $ python3 app.py 로 실행 가능
+
+- 파일 드래그 앤 드랍으로 복사 가능
+
+2. Mobaxterm
+mobaxterm으로도 접속 -> session -> ssh -> host ip, username, use private key -> ok -> 창 열림
+
+
+-----------------------------5. vscode에서 flask
+#설치셋업
+sudo apt install python3-pip   # 리눅스에서 파이썬의 pip쓰기위해
+sudo apt install python3.14-venv   # 리눅스에서 가상환경만들기
+python3 -mvenv ~/.venv/flask
+
+#매번 열때마다 여기서부터 활성화해야함
+source ~/.venv/flask/bin/activate -> pip install flask -> 
+-> app.run(host="0.0.0.0") 으로 지정  #여기서 이게 netstat -antp의 :5000을 0.0.0.0:5000으로 만드는거
+-> SG인바운드 규칙에 포트 5000허용
+->  python 2.flask.py로 실행 -> 다른 터미널에 curl localhost:5000하면 내용도 뜸 -> 크롭에서 ip:5000하면 뜸
+
+
+
+
+-----------------------------6. 타 DB서버에 접속하는법
+1. DB-서버:
+	sudo apt install mysql-server로 설치 -> sudo mysql 로SQL로 전환 -> CREATE DATABASE sesac; 으로 DB만들고 -> USE sesac;  -> 이 안에서 table만들고 Data insert함
+	 -> 계정만들기: CREATE USER 'woohyun'@'%' IDENTIFIED BY '1234';	# woohyun계정 생성
+	-> 권한 부여: GRANT ALL PRIVILEGES ON sesac.* TO 'woohyun'@'%';   	# sesac에 대한 권한을 woohyun한테 부여
+	-> 보안그룹 열기: cat /etc/services | grep mysql하면 3306뜸 -> 인바운드 규칙 추가
+	-> mysql서비스의 기본보안도 뚫어야함: sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf -> bind address를 127.0.0.1에서 0.0.0.0으로 바꿈
+		-> sudo systemctl restart mysql -> -> sudo netstat -antp -> 0.0.0.0:3306 이어서 MySQL이 모든 네트워크 인터페이스에서 접속을 받을 준비가 됨
+
+2. DB-클라이언트
+	sudo apt install mysql-client -> mysql -h 172.31.6.107(서버주소) -u woohyun -p 
+	-> 비번 입력 -> use sesac; -> select * from table; 하면 결과 나옴
+
+
+
+--------------------------7. 서버안으로 파일 보내기
+1. cmd: scp -i 키파일 보낼파일 사용자@우리의서버:/받을파일경로+이름 
+	: scp ⬛ -i ⬛ C:\Users\SBA\Downloads\woohyun-web-key.pem ⬛ C:\Users\SBA\Downloads\day_2_img.png ⬛ ubuntu@43.203.241.185:~/hello.jpg
+
+2. vscode나 Mobaxterm에서 드래그앤 드랍
+
+
+-------------------------8. NACL: 서브넷 보안
+VPC -> 왼쪽 네트워크ACL -> 인바운드/아웃바운드 규칙 편집 -> 인바운드규칙추가 
+-> 규칙번호잘정해서(숫자 작을수록 우선) 서브넷 전체에 규칙 적용
+
+
+
+----------------------------9. key지정 없이 자동으로 접속하는 법 by SSH-agent
+			-> 공인->사설EC2로 접속하기 위해!!!(우리 윈도우스에서 바로 접속불가:private subnet이라)
+
+powershell를 관리자로 실행 -> Get-Service ssh-agent | Set-Service -StartupType Manual  # 설정변경 -> Start-Service ssh-agent  로 실행
+-> cmd에서 ssh-add C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem 로 추가 -> ssh-add -l 로 추가된 키목록 확인
+-> 삭제하고 싶으면 ssh-add -d C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem
+
+1. CMD
+	-> ssh ubuntu@3.38.151.208 -A 로 키없이 바로
+	-> 또 들어가서 ssh ubuntu@10.0.30.18 로 사설ip로 키 없이 입장 가능(-A해야 담꺼 키없이 가능)
+
+2. MobaXterm
+	1. settings -> SSH -> SSH agents에 use internal SSH agent MobAgent 클릭-> show keys클릭 -> add key ->ok
+		-> 이제부터 -A로 입장가능
+	2. 바로 사설ip로 접속하기: -> session -> SSH -> host와 유저에 공인꺼 입력 -> advanced ssh세팅에 키 넣어주고
+	-> network setting들어가서 SSH gateway 클릭
+	-> gateway host와 이름으로 private EC2 입력, port22유지(SSH), 키도 집어넣음 -> ok -> ok하면 사설ip바로 접속
+
+3. vscode: config에
+Host was3_10.0.30.18
+  	HostName 10.0.30.18    # 사설ip
+  	User ubuntu
+  	IdentityFile C:\Users\SBA\Downloads\woohyun-sesac-vpc-key.pem  # 얘는 없어도 되긴함(ssh-agent땜에)
+ 	ProxyJump web1_54.180.126.208    # 이거 타고 들어가겠다
+
+
+
+-------------------------------10. 3-tier VPC 구축
+조건: 
+VPC: 10.0.0.0/16
+	az-1			az-3
+pub-sub1(10.0.10.0/24)	pub-sub2(10.0.20.0/24)
+ 	web1(nginx)
+
+pri-sub3(10.0.30.0/24)	pri-sub4(10.0.40.0/24)
+	was3(flask)		was4
+
+			pri-sub5(10.0.50.0/24)
+				DB5(mysql)
+
+@목표: was3과 db5는 private이며 web1에서 was3 접속하게하고, was3에서 DB5에 접속하게 하기
+
+1. VPC생성(10.0.0.0/16) 
+2. 서브넷 생성: 서브넷 위처럼 5개 생성 -> 서브넷1과2만 자동 공인ip할당
+3. 라우터 생성 및 연결: 라우팅 테이블 하나는 이미 자동 생성(router1) + 추가로 pri용 라우터생성(router2) -> 서브넷연결편집으로 router1에 pub만, router2에 pri만
+4. IGW생성 및 라우터1에 연결: igw생성-> vpc에 연결 
+	-> 라우터1로 가서 라우팅 편집 -> 라우팅추가: 0.0.0.0/0 + 인터넷게이트웨이(igw)
+5. NAT 게이트웨이 생성 및 라우터2로 연결: natgw생성-리전별(신규)로 편리하게(원래는 pub-sub1 or 2에) + vpc지정 + 자동 탄력적 ip
+	-> 라우터2로가서 라우팅편집 -> 라우팅 추가 0.0.0.0/0 + NAT게이트웨이(natgw)에 연결 
+6. 미리 security group생성:
+	web-sg: ssh + http (전부 0.0.0.0/0)
+	was-sg: ssh + flask(5000) (전부 0.0.0.0/0)
+	db-sg: ssh + mysql(3306) (전부 0.0.0.0/0)
+7. EC2생성(web1,was3,db5):
+	web1: t3.micro + pub-sub1 + web-sg
+	was3: t3.medium + pri-sub3 + was-sg
+	db5: t3.large + pri-sub5 + db-sg
+8. ssh-agent: powershell를 관리자로 실행 -> Get-Service ssh-agent | Set-Service -StartupType Manual  # 설정변경 -> Start-Service ssh-agent  로 실행
+	-> cmd에서 ssh-add [key] 로 추가 -> ssh-add -l 로 추가된 키목록 확인
+9. vscode config에: 
+Host web1_52.78.97.205
+  HostName 52.78.97.205
+  User ubuntu
+  IdentityFile C:\Users\kkangwook\Downloads\home-key.pem
+
+Host was3_10.0.30.130
+  HostName 10.0.30.130
+  User ubuntu
+  IdentityFile C:\Users\kkangwook\Downloads\home-key.pem
+  ProxyJump web1_52.78.97.205
+
+Host db5_10.0.50.11
+  HostName 10.0.50.11
+  User ubuntu
+  IdentityFile C:\Users\kkangwook\Downloads\home-key.pem
+  ProxyJump web1_52.78.97.205
+
+10. was3에 flask 운영 및 web1에서 접속
+was3에 플라스크 설치: sudo apt install python3-venv -> sudo apt install python3-pip -> python3 -mvenv ~/.venv/flask
+	-> source ~/.venv/flask/bin/activate -> pip install flask
+	-> flask 코드 작성 -> app.run(host="0.0.0.0")으로 netstat -antp의 :5000열리게 -> 하지만 외부에서는 못들어옴
+외부에서 web1으로 접속할수있게 was3결과를 web1으로 가져오기: web1에서 nginx설치 -> sudo vi /etc/nginx/sites-available/default 
+	-> location밑에 	location /was {proxy_pass http://[was3 사설 ip]:5000/;}      #-> web1 ip/was하면 http://[was3사설ip]:5000여기로 보내겠다
+	-> sudo systemctl restart nginx로 재시작 -> http://[web1ip]/was 하면 접속!!!
+
+11. DB5에 was3이 접속하기
+DB5:	sudo apt install mysql-server로 설치 -> sudo mysql 로SQL로 전환 -> CREATE DATABASE sesac; 으로 DB만들고 -> USE sesac;  -> 이 안에서 table만들고 Data insert함
+	 -> 계정만들기: CREATE USER 'woohyun'@'%' IDENTIFIED BY '1234';	# woohyun계정 생성
+	-> 권한 부여: GRANT ALL PRIVILEGES ON sesac.* TO 'woohyun'@'%';   	# sesac에 대한 권한을 woohyun한테 부여
+	-> 보안그룹 열기: cat /etc/services | grep mysql하면 3306뜸 -> 인바운드 규칙 추가
+	-> mysql서비스의 기본보안도 뚫어야함: sudo vi /etc/mysql/mysql.conf.d/mysqld.cnf -> bind address를 127.0.0.1에서 0.0.0.0으로 바꿈
+		-> sudo systemctl restart mysql -> -> sudo netstat -antp -> 0.0.0.0:3306 이어서 MySQL이 모든 네트워크 인터페이스에서 접속을 받을 준비가 됨
+
+was3:	sudo apt install mysql-client -> mysql -h [db5사설주소] -u woohyun -p 
+	-> 비번 입력 -> use sesac; -> select * from table; 하면 결과 나옴
