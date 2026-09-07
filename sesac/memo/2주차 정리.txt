@@ -70,8 +70,8 @@ db2: 10.0.0.80/28
 ------------------------------------------------------실습----------------------------------------------
 1. web대신 bastion으로 private EC2접속
 
-	Bastion 전용의 SG생성( 인바운드 규칙: ssh-사용자지정-Bastion의 사설ip/32) #Bastion만 접속가능하게
-	-> Bastion EC2생성 -> Bastion에 SG적용 및 private EC2도 전부 적용
+	Bastion EC2생성 -> Bastion 전용의 SG생성( 인바운드 규칙: ssh-사용자지정-Bastion의 사설ip/32) #Bastion만 접속가능하게
+	-> Bastion에 SG적용 및 private EC2도 전부 적용
 	-> Bastion EC2의 공인 IP로 접속 -> Private EC2로 접속 by ssh-agent or proxyjump
 
 
