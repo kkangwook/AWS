@@ -1,0 +1,57 @@
+----------------이론----------------
+VPC끼리는 IPv4 CIDR같아도 괜찮
+실제 회사는 bastion안쓰고 따로 사설망 구축하고 거기의 VPN 게이트웨이로 AWS접속
+RDS는 proxy_jump가 불가: 따로 was ec2접속-> RDS로 접속가능(was ec2연결 + sg로 3306에 was허용하므로) 
+RDS는 무조건 multi-az로 생성됨 -> db1장애나면 db2에서 대신
+RDS는 proxy_jump가 불가
+
+----------------------RDS실습--------------------------
+1. multi-az RDS만들기
+	VPC생성 -> 가용영역 a,c에 각각 web, was 각각 2개씩생성
+	-> DB-subnet도 각각 2개씩 생성 (여기에 RDS 만들꺼임
+	-> pub-router는 web에, private-router는 was, db에 + IGW, NAT gateway각각 부착
+	-> web, was SG생성
+----- new!
+	1. **RDS에서 왼쪽에 서브넷 그룹생성: 가용영역2개 + 각 영역별 db1, db2서브넷 선택 -> 생성
+	2. **RDS(DB)용 SG생성: mysql, **was-sg소스 적용
+	3. DB생성 (전체구성으로)
+	-> sql종류엔진 선택 -> 개발/테스트-> **다중A-Z -> 이름
+	-> **자격증명 자체관리 -> 암호지정 -> 인스턴스유형 -> 스토리지 20GB
+	-> **컴퓨팅 리소스 연결 X -> VPC연결 -> **DB서브넷 그룹 연결
+	-> 퍼블릭 엑세스 X -> **DB-SG선택 (or 나중에 수정으로 변경)
+	-> (자동 백업 기능도 있음)
+	-> 생성 -> DB에 was EC2 연결
+	-> DB들어가면 curl로 인증서받기 + 그밑에 접속코드있음(no인증서면 -ssl이후 빼고)
+	-> was에서는 연결됨 / web에서는 연결안됨
+	-> 다중 az덕에 자동으로 2곳으로 나눠서 로드밸런싱!!!(내가 따로 해줄건 없음)
+
+2. 여러 RDS 기능들:
+	- 파라미터 그룹 생성에서 편집으로 변경(GUI에서 해야함)	
+	- 백업: DB 스냅샷 생성 -> 스냅샷클릭 -> 스냅샷 복원으로 새로운 복사된 DB
+	- DB수정에서 자동 백업 활성화도 가능
+	- vscode에서는 드래그 드랍으로 파일옮기기 가능
+	
+3. 삭제할때
+	삭제 -> 최종 스냅샷 필요없으면 X -> 자동 백업 보존도 필요없으면 X -> 인정 -> delete me -> 삭제
+	-> RDS 서브넷 삭제 -> RDS 라우팅 테이블도 삭제 -> RDS관련 보안그룹 일일히 인바우드 아웃바운드 들어가서 다른 참소된 소스들 제거
+	-> was에 붙은 rds보안그룹도 떼어냄 -> 이제 rds보안그룹 삭제!!!
+
+4. DB 다른 RDS로 by dump
+	1. 온프레미스에서:
+	$ sudo mysqldump --databases testdb > file.sql   # testdb 데이터베이스 전체+ 코드까지 file.sql이라는 파일로 생성
+	-> file.sql 파일 우클릭 해서 다운
+	2. RDS접속용 was에서 우클릭해서 file.sql 업로드
+	->  $ mysql -h <원격rdb엔드포인트> -u admin -p db이름 < file.sql
+		이때 엔드포인트예시: my-shop-db3.c5s4ce2max4b.ap-northeast-2.rds.amazonaws.com
+	-> RDS에 db올라감 -> db이름이 아닌 testdb와 안의 table이 생송됨
+
+5. Failover test
+	was에서 
+	while true; do
+  	   date
+  	   nc -vz -w 2 <원격rdb엔드포인트> 3306
+  	   sleep 2
+	done 하면
+	-> succeed뜸 -> DB 그냥 재부팅하면 ip똑같으면서 failed됐다가 succeed
+	-> DB장애 재부팅하면 중간에 다른 db로 변경되면서 ip도 같이 변경
+	=>즉, 장애로재부팅하면 db-a는 재부팅하고 db-b가 대신하는거를 확인하는거
