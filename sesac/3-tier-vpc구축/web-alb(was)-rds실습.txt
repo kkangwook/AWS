@@ -1,0 +1,232 @@
+-template만들때 key, was-asg만큼은 꼭 넣기(asg만들때 sg선택없음!!)
+
+# tg와 alb만들때 http는 그냥 통신방식임/ 포트번호가 중요!!!!
+-alb는 그대로 http 80 (이후 대상그룹으로 tg선택)  
+	-> web의 nginx에서 proxy_pass http://ALB_DNS; 함-> 이는 :5000같은걸 안붙여줬으므로 그냥 80포트로감
+	-> 즉 alb는 80을 열어놔야함
+	(리스너를 7777로 열어놓으면 proxy_pass http://ALB_DNS:7777; 로 하면됨)
+
+-target-group에서 http와 5000으로  
+	-> 대상그룹(asg-was)의 Flask의 app.run(..., port=5000)이므로
+	-> ALB가 WAS-asg의 5000번으로 HTTP 요청을 보내기 위해
+=> 즉 ALB는 80번으로 받아서 5000번으로 보내는거
+
+-다 연결하고 나서 was-sg의 5000을 web에서 was-alb-sg로 변경
+
+
+
+
+
+WEB(nginx)-ALB(WAS-FLASK)-DB(RDB)구축 실습
+
+VPC: 10.0.0.0/16
+
+SUBNET:
+	AZ-a		AZ-c
+   pub-web-sub1	    pub-web-sub2
+    10.0.10.0/24	      10.0.11.0/24
+
+   pri-was-sub1         pri-was-sub2
+    10.0.20.0/24	       10.0.21.0/24
+
+    pri-db-sub1           pri-db-sub2
+     10.0.30.0/24	      10.0.31.0/24
+
+bastion없이 web접속, web통해 
+
+
+                            Internet
+                               |
+                   +-----------+-----------+
+                   |                             |
+                 WEB-A                   WEB-C	stress서버따로
+                 Nginx                      Nginx
+                   |                             |
+                   +-----------+-----------+
+                                 |
+                                 | HTTP :80
+                                 v
+                        Internal ALB-WAS
+                        (Private Subnets)
+                                 |
+                              TG-WAS
+                            HTTP :5000
+                                  |
+              +----------------+-------------------+
+              |                    |                        |
+            WAS-1            WAS-2               WAS-3
+            Flask               Flask                  Flask
+              |________ Auto Scaling Group ______|
+                   Min 1 / Desired 1 / Max 3
+                                  |
+                                  | MySQL :3306
+                                  v
+                            RDS Multi-AZ
+
+Stress EC2 --HTTP Load--> WEB-A or WEB-C
+
+
+@@@@@@@@@@@@@@@@@web코드@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+location / { 
+    proxy_pass http://INTERNAL_ALB_DNS; 
+    proxy_set_header Host $host; 
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+
+
+@@@@@@@@@@@@@@@@@was코드@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#python, flask설치
+sudo apt install -y python3 python3-pip python3-venv 
+
+#가상환경 생성
+python3 -m venv venv
+source venv/bin/activate
+
+#패키지설치
+pip install flask pymysql
+
+
+#FLASK코드
+###########################################################################3
+from flask import Flask, request
+import pymysql
+import socket
+from werkzeug.serving import WSGIRequestHandler
+
+app = Flask(__name__)
+APP_VERSION = "v1"
+
+class RealIPHandler(WSGIRequestHandler): 
+    def address_string(self): 
+        return self.headers.get("X-Real-IP") or super().address_string()
+
+@app.route("/")
+def index(): 
+    conn = pymysql.connect( 
+        host="RDS_ENDPOINT", 
+        user="webuser", 
+        password="password", 
+        database="testdb" 
+    ) 
+
+    cursor = conn.cursor() 
+    cursor.execute("SELECT * FROM products") 
+    products = cursor.fetchall() 
+    cursor.close() 
+    conn.close() 
+
+    hostname = socket.gethostname() 
+    html = f"<h2>WAS Server: {hostname} / Version: {APP_VERSION}</h2>" 
+    html += "<h1>상품 목록</h1><ul>" 
+
+    for product in products: 
+        html += f"<li>{product[0]} / {product[1]} / {product[2]}원</li>" 
+    html += "</ul>" 
+    return html
+
+@app.route("/health")
+def health(): 
+    return "OK\n"
+
+@app.route("/info")
+def info(): 
+    return f"WAS={socket.gethostname()} VERSION={APP_VERSION}\n"
+
+@app.route("/stress")
+def stress(): 
+    load = int(request.args.get("load", 1)) 
+    load = max(1, min(load, 5)) 
+
+    result = 0 
+    for i in range(load * 100000): 
+        result += i * i 
+
+    return (f"WAS={socket.gethostname()} " 
+        f"VERSION={APP_VERSION} load={load}\n")
+
+if __name__ == "__main__": 
+    app.run(host="0.0.0.0", port=5000, request_handler=RealIPHandler)
+#######################################################################3
+
+#flask자동실행시키는법
+sudo vi /etc/systemd/system/flask.service
+
+밑에 그대로 파일에 넣음
+#############
+[Unit]
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/home/ubuntu/venv/bin/python /home/ubuntu/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now flask
+systemctl status flask
+#######################
+
+이 밑에서부터는 터미널에서 다시 실행
+sudo systemctl daemon-reload
+sudo systemctl enable --now flask
+systemctl status flask
+
+@@@@@@@@@@@@@@@@@RDS코드@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+사용자: admin
+비번 admin123!
+
+CREATE DATABASE testdb;
+USE testdb;
+
+CREATE TABLE products ( 
+    id INT AUTO_INCREMENT PRIMARY KEY, 
+    name VARCHAR(100), 
+    price INT);
+
+INSERT INTO products (name, price) VALUES
+('노트북', 1500000),
+('키보드', 100000),
+('마우스', 50000),
+('모니터', 300000);
+
+CREATE USER 'webuser'@'10.0.%'IDENTIFIED BY 'password';
+GRANT ALL PRIVILEGES ON testdb.*TO 'webuser'@'10.0.%';
+FLUSH PRIVILEGES;
+
+
+
+
+@@@@@@@@@@@@@@@@@test-web코드@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#Scale-Out 이충분히발생하지않으면load=5 또는-c 30 정도로한단계높이기
+while true; do ab -n 1000 -c 20 "http://WEB_PUBLIC_IP/stress?load=3" > /dev/null; done
+
+for i in {1..20}; do curl -s "http://WEB_PUBLIC_IP/stress?load=1"; done
+-> ip가 3개까지 바뀌는지 확인
+
+
+또한 web에서 was로 직접 접속 불가해야함!!!
+-> nc -zv -w 3 WAS_PRIVATE_IP 5000  했을때 timeout떠야함
+
+
+SG그룹 구성
+| 보안 그룹          | 연결할 대상                | 허용 포트 | 소스                         | 이유                                     |
+| ----------------- --| ---------------------------| ------------| -------------------------- | ------------------------------------- |
+| SG-WEB        | WEB-A, WEB-C                | TCP 80    | `0.0.0.0/0`                   | 인터넷에서 웹페이지 접속          |
+| SG-WEB        | WEB-A, WEB-C                | TCP 22    | 내 PC의 공인 IP/32       | 내 PC에서 WEB에 SSH 접속     |
+| SG-ALB-WAS | Internal ALB                    | TCP 80    | SG-WEB                     | WEB의 Nginx가 보낸 요청만 수신  |
+| SG-WAS       | ASG가 생성하는 모든 WAS | TCP 5000 | SG-ALB-WAS               | ALB가 전달하는 요청과 헬스 체크 수신 |
+| SG-WAS       | ASG가 생성하는 모든 WAS | TCP 22    | SG-WEB — 필요할 때만 | WEB을 경유해서 WAS에 SSH 접속  |
+| SG-RDS        | RDS                              | TCP 3306 | SG-WAS                     | Flask 서버만 DB에 접속       |
