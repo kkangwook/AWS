@@ -1,0 +1,82 @@
+1. HTTPS -> HTTP변환을 SSL Termination이라고 함
+2. URL 경로를 기반으로 로드밸런싱
+	/ 		-> was A
+	/user 		-> was B
+	/product 	-> was C
+
+shell script넣을때:  처음에 DEBIAN_FRONTEND=noninteractive   ->  사용자랑 상호작용 안하게
+점검도구 apache2말고도 diagnostic tools 있음
+	stress-ng 패키지
+
+#!/bin/bash
+DEBIAN_FRONTEND=noninteractive
+apt update
+apt install -y nginx stress-ng
+
+mkdir -p /var/www/html/shop /var/www/html/api
+
+printf "<h1>SESAC Web Server</h1><p>Host: %s</p>\n" "$(hostname)" > /var/www/html/index.html
+printf "<h1>SHOP</h1><p>Host: %s</p>\n" "$(hostname)" > /var/www/html/shop/index.html
+printf "<h1>API</h1><p>Host: %s</p>\n" "$(hostname)" > /var/www/html/api/index.html
+printf "ok\n" > /var/www/html/health
+
+
+
+------------------------------------
+ASG -> automatic scaling -> 예약된 작업 생성으로 예약도 가능
+
+cron: 리눅스에서 정해진 시간마다 명령어나 스크립트를 자동 실행해 주는 기능
+	1. 사용자별 크론이 따로 있음
+		crontab -e   # 현재 사용자의 예약 작업 편집
+		crontab -l   # 등록된 예약 작업 확인
+	2. 시스템 크론도 존재: 시스템이 주기적으로 하는 업데이트들 등..
+		/etc/cron.d
+		/etc/cron.daily
+		/etc/cron.weekly
+		/etc/cron.monthly	=> 각 위치별로 시스템이 주기적으로 실행하는 것들이 있음
+		
+		cat /etc/crontab => 몇시 언제에 각 작업들을 실행할지 예약정보 있는 파일
+				=> 이 시간이 겹치지 않는게 중요!!!!
+		
+
+stress 도구를 활용한 확장
+해당 ASG로 생성된 EC2에 들어가 stress-ng
+stress-ng --cpu 2 --cpu-load 80 --timeout 300s   # 스트레스 주겠다 cpu2개?, cpu80퍼로 300초간
+
+이때 부하정도는 모든 EC2의 CPU사용률 평균값으로 계산
+
+
+----------------ALB: /url주소별로 EC2 따로 분해하는것도 가능하다
+
+
+우리 /, /api, /shop이렇게 만들었었음 => url/api했을때와 url/shop했을때 api는 서브넷1의 EC2로, shop은 서브넷2의 EC2로 보내기 
+	(로드밸런서 ->ALB -> URL경로기반이라는 규칙)
+로드밸런서 -> 리스너 및 규칙추가 -> HTTP80 클릭(여기에 규칙추가하겠다) -> 규칙관리 -> 규칙추가
+-> 조건 경로: /shop/* -> shop대상그룹(빈 EC2) 생성 -> 선택 -> 규칙2개됨
+-> 조건 경로: /api/* -> api대상그룹(빈 EC2) 생성 -> 선택 -> 규칙3개됨
+
+api대상그룹 클릭 -> 대상 -> 대상등록 2개 선택(10.0.10.0/24) -> 보류중인거으로 포함 -> 등록
+shop대상그룹 클릭 -> 대상 -> 대상등록 2개 다른거로 선택 (10.0.100.0/24)-> 보류중인거으로 포함 -> 등록
+
+curl MywebNLB-f6c194161f5a303a.elb.ap-northeast-2.amazonaws.com/api/   -> 하면 10.0.10.0/24인것만 뜸
+curl MywebNLB-f6c194161f5a303a.elb.ap-northeast-2.amazonaws.com/shop/ -> 하면 10.0.100.0/24인것만 뜸
+
+
+----------------------------------------------------------------------------
+cloudwatch -> 지표 -> 탐색기 -> 유형별 -> 지표들 나옴
+
+cloudwatch -> 경보 -> 경보생성 => 클래식 -> 지표선택 -> 검색으로 cpu utilization -> auto sacling그룹별 -> 경보 부여할 ASG골라서 클릭 -> 지표선택
+-> 통계, 기간 정함 -> 조건 정함(cpu50을 임계값으로) -> 다음 -> 새 주제생성 -> 이메일 -> 주제생성 -> 다음 -> 이름 -> 다음 -> 경보생성
+-> ASG클릭 -> automatic scaling에서 기존꺼 cpu50 비활성화 -> 동적 크기조정 정책 생성 -> 단계크기조정 -> 방금 만든 CW로 경보지정 -> 용량 1로  <-이건 뭐야?
+-> ASG들어가서 편집 -> 원하는용량 하나로 -> 이 EC2에 접속 -> stress-ng --cpu 2 --cpu-load 80 --timeout 600s으로 부하주기 -> 창 하나 더 띄어 htop으로 확인
+-> 클라우드 워치 ->지표 -> 클래식지표 -> cpu utilization검색 -> ASG선택 ->cpu사용량 볼수있음 -> CW의 경보 보면 경보켜진걸 볼 수 있음
+-> ASG로 가면 경보때문에 EC2 2개로 늘어난것을 볼 수 있음 -> 다시 동적크기조정정책생성 들어가서 
+-> cpu10%미만일떄의 CW경보 생성시키고 경보에 넣고 -> 작업수행으로 제거, 용량단위 1하면
+-> cpu 10%미만일떄 경보켜지게 되면서 EC2 1개씩 제거하게됨 -> 1개됨
+
+=> 또한 다양한 지표들 있음
+
+
+
+-----------------------------------------------------------------
+was ALB를 위한 대상그룹만들때 HTTP로 하지만 was(flask)로 가야하기에 포트번호를 5000으로 해줘야함!!!! 
